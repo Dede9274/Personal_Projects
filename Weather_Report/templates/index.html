@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Weather Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body class="{% if weather %}theme-{{ weather.condition.theme }}{% else %}theme-cloudy{% endif %}">
+    <main class="shell">
+      <section class="search-panel">
+        <div>
+          <p class="eyebrow">Open-Meteo forecast</p>
+          <h1>Weather room</h1>
+        </div>
+        <form method="post" class="search-form">
+          <input type="text" name="city" value="{{ city }}" placeholder="Search a city" aria-label="City name">
+          <button type="submit">Check weather</button>
+        </form>
+      </section>
+
+      {% if error %}
+        <section class="notice">{{ error }}</section>
+      {% endif %}
+
+      {% if weather %}
+        <section class="today-grid">
+          <article class="current-panel">
+            <div class="weather-scene" aria-hidden="true">
+              <span class="sun"></span>
+              <span class="cloud cloud-one"></span>
+              <span class="cloud cloud-two"></span>
+              <span class="rain rain-one"></span>
+              <span class="rain rain-two"></span>
+              <span class="bolt"></span>
+              <span class="snow snow-one"></span>
+              <span class="snow snow-two"></span>
+              <span class="fog fog-one"></span>
+              <span class="fog fog-two"></span>
+            </div>
+            <div>
+              <p class="eyebrow">Now in</p>
+              <h2>{{ weather.location.city }}</h2>
+              <p class="condition-line">{{ weather.condition.description }}</p>
+            </div>
+            <div class="current-reading">
+              <span>{{ weather.current.temperature_2m }}</span>
+              <small>{{ weather.units.current.temperature_2m }}</small>
+            </div>
+            <div class="current-meta">
+              <span>{{ weather.current.time }}</span>
+              <span>Wind {{ weather.current.wind_speed_10m }} {{ weather.units.current.wind_speed_10m }}</span>
+            </div>
+          </article>
+
+          <article class="stat-card warm">
+            <span>Day high</span>
+            <strong>{{ weather.summary.high }}{{ weather.units.hourly.temperature_2m }}</strong>
+          </article>
+          <article class="stat-card cool">
+            <span>Day low</span>
+            <strong>{{ weather.summary.low }}{{ weather.units.hourly.temperature_2m }}</strong>
+          </article>
+          <article class="stat-card humid">
+            <span>Avg humidity</span>
+            <strong>{{ weather.summary.average_humidity }}{{ weather.units.hourly.relative_humidity_2m }}</strong>
+          </article>
+          <article class="stat-card wind">
+            <span>Peak wind</span>
+            <strong>{{ weather.summary.peak_wind }} {{ weather.units.hourly.wind_speed_10m }}</strong>
+          </article>
+        </section>
+
+        <section class="chart-section weekly-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">7 day outlook</p>
+              <h2>Week at a glance</h2>
+            </div>
+            <div class="toggle-group" aria-label="Weekly chart metric">
+              <button type="button" class="week-button active" data-week-metric="temperature">High / low</button>
+              <button type="button" class="week-button" data-week-metric="precipitation">Rain chance</button>
+              <button type="button" class="week-button" data-week-metric="wind_speed">Wind</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="weeklyChart" height="300"></canvas>
+          </div>
+          <div class="daily-strip">
+            {% for day in weather.days %}
+              <article class="daily-card {{ day.theme }}">
+                <span>{{ day.label }}</span>
+                <strong>{{ day.high }}{{ weather.units.daily.temperature_2m_max }}</strong>
+                <small>{{ day.condition }}</small>
+                <small>{{ day.low }}{{ weather.units.daily.temperature_2m_min }} low · {{ day.precipitation }}{{ weather.units.daily.precipitation_probability_max }} rain</small>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="chart-section hourly-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">{{ weather.summary.timezone }}</p>
+              <h2>Today by the hour</h2>
+            </div>
+            <div class="toggle-group" aria-label="Chart metric">
+              <button type="button" class="metric-button active" data-metric="temperature">Temperature</button>
+              <button type="button" class="metric-button" data-metric="humidity">Humidity</button>
+              <button type="button" class="metric-button" data-metric="wind_speed">Wind</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="weatherChart" height="280"></canvas>
+          </div>
+        </section>
+
+        <section class="hourly-list">
+          {% for hour in weather.hours %}
+            <article class="hour-row hour-{{ hour.temperature_theme }}" style="--temp-level: {{ hour.temperature_level }};" data-temp="{{ hour.temperature }}" data-humidity="{{ hour.humidity }}" data-wind="{{ hour.wind_speed }}">
+              <span class="hour-time">{{ hour.label }}</span>
+              <span class="hour-temp">{{ hour.temperature }}{{ weather.units.hourly.temperature_2m }}</span>
+              <span class="hour-meter" aria-hidden="true"><span></span></span>
+              <span class="hour-detail">{{ hour.humidity }}{{ weather.units.hourly.relative_humidity_2m }} humidity</span>
+              <span class="hour-detail">{{ hour.wind_speed }} {{ weather.units.hourly.wind_speed_10m }}</span>
+            </article>
+          {% endfor %}
+        </section>
+
+        <script id="weather-data" type="application/json">{{ weather.hours | tojson }}</script>
+        <script id="weekly-data" type="application/json">{{ weather.days | tojson }}</script>
+      {% endif %}
+    </main>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
