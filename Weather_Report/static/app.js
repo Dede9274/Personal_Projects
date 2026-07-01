@@ -129,6 +129,16 @@ function drawLineChart({ targetCanvas, context, items, metric, height = 280, lab
       context.fillText(item[labelKey], point.x - 14, height - 8);
     }
   });
+
+  return {
+    color,
+    height,
+    metric,
+    points: points.map((point, index) => ({
+      ...point,
+      item: items[index]
+    }))
+  };
 }
 
 function drawTemperatureBand({ targetCanvas, context, items, height = 300 }) {
@@ -220,11 +230,46 @@ function drawTemperatureBand({ targetCanvas, context, items, height = 300 }) {
 if (dataElement && canvas) {
   const weatherHours = JSON.parse(dataElement.textContent);
   const context = canvas.getContext("2d");
+  const tooltip = document.createElement("div");
+
+  tooltip.className = "chart-tooltip";
+  tooltip.setAttribute("role", "status");
+  canvas.parentElement.appendChild(tooltip);
 
   let activeMetric = "temperature";
+  let activeChart = null;
+
+  function formatMetricValue(item, metric) {
+    if (metric === "temperature") {
+      return `${item.temperature}°C`;
+    }
+
+    if (metric === "humidity") {
+      return `${item.humidity}% humidity`;
+    }
+
+    return `${item.wind_speed} km/h wind`;
+  }
+
+  function drawHoverMarker(point) {
+    context.beginPath();
+    context.moveTo(point.x, 36);
+    context.lineTo(point.x, activeChart.height - 36);
+    context.lineWidth = 1;
+    context.strokeStyle = "rgba(26, 31, 36, 0.28)";
+    context.stroke();
+
+    context.beginPath();
+    context.arc(point.x, point.y, 8, 0, Math.PI * 2);
+    context.fillStyle = "#fffdf7";
+    context.fill();
+    context.lineWidth = 3;
+    context.strokeStyle = activeChart.color;
+    context.stroke();
+  }
 
   function drawChart(metric) {
-    drawLineChart({
+    activeChart = drawLineChart({
       targetCanvas: canvas,
       context,
       items: weatherHours,
@@ -232,15 +277,49 @@ if (dataElement && canvas) {
     });
   }
 
+  function showTooltip(event) {
+    if (!activeChart) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const closestPoint = activeChart.points.reduce((closest, point) => {
+      return Math.abs(point.x - mouseX) < Math.abs(closest.x - mouseX) ? point : closest;
+    });
+
+    drawChart(activeMetric);
+    drawHoverMarker(closestPoint);
+
+    tooltip.innerHTML = `
+      <strong>${closestPoint.item.label}</strong>
+      <span>${formatMetricValue(closestPoint.item, activeMetric)}</span>
+    `;
+    tooltip.style.left = `${closestPoint.x}px`;
+    tooltip.style.top = `${Math.max(18, closestPoint.y - 54)}px`;
+    tooltip.classList.add("visible");
+  }
+
+  function hideTooltip() {
+    tooltip.classList.remove("visible");
+    drawChart(activeMetric);
+  }
+
   buttons.forEach((button) => {
     button.addEventListener("click", () => {
       activeMetric = button.dataset.metric;
       buttons.forEach((item) => item.classList.remove("active"));
       button.classList.add("active");
+      tooltip.classList.remove("visible");
       drawChart(activeMetric);
     });
   });
 
+  canvas.addEventListener("mousemove", showTooltip);
+  canvas.addEventListener("mouseleave", hideTooltip);
+  canvas.addEventListener("touchstart", (event) => showTooltip(event.touches[0]), { passive: true });
+  canvas.addEventListener("touchmove", (event) => showTooltip(event.touches[0]), { passive: true });
+  canvas.addEventListener("touchend", hideTooltip);
   window.addEventListener("resize", () => drawChart(activeMetric));
   drawChart(activeMetric);
 }

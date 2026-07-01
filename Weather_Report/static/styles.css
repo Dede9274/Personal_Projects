@@ -522,6 +522,41 @@ canvas {
   width: 100%;
 }
 
+.chart-tooltip {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  min-width: 108px;
+  padding: 8px 10px;
+  border: 1px solid rgba(26, 31, 36, 0.12);
+  border-radius: 8px;
+  color: #fffdf7;
+  background: rgba(26, 31, 36, 0.92);
+  box-shadow: 0 14px 28px rgba(31, 37, 43, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -8px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+  transform: translate(-50%, -14px);
+}
+
+.chart-tooltip strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.chart-tooltip span {
+  color: rgba(255, 253, 247, 0.8);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .daily-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(112px, 1fr));
