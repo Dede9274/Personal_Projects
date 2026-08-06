@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "Digital_Archive_Scanner",
+  "project_id": "c57599e7-01a5-422d-a200-ad861c60b8cf"
+}
