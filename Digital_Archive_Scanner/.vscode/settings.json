@@ -1,0 +1,6 @@
+{
+    "terminal.integrated.env.windows": {
+        "PATH": "C:\\Program Files\\Tesseract-OCR;${env:PATH}",
+        "TESSDATA_PREFIX": "C:\\Users\\Olti Demiri\\AppData\\Local\\Tesseract-OCR\\tessdata"
+    }
+}

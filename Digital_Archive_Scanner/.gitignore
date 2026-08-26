@@ -4,3 +4,29 @@
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Scanned documents must never be committed
+samples/*.pdf
+data/incoming/*
+data/processing/*
+data/archive/*
+data/needs_review/*
+data/failed/*
+data/duplicates/*
+data/logs/*
+!data/incoming/.gitkeep
+!data/processing/.gitkeep
+!data/archive/.gitkeep
+!data/needs_review/.gitkeep
+!data/failed/.gitkeep
+!data/duplicates/.gitkeep
+!data/logs/.gitkeep
