@@ -5,6 +5,7 @@ import sys
 
 from app.database.connection import engine
 from app.database.repository import get_active_monitors
+from app.queue.connection import close_redis_connection
 from app.services.scheduler import Scheduler
 
 
@@ -19,6 +20,7 @@ async def main() -> None:
         scheduler = Scheduler(monitors)
         await scheduler.run()
     finally:
+        await close_redis_connection()
         await engine.dispose()
 
 

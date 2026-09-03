@@ -2,9 +2,8 @@ import asyncio
 import time
 from dataclasses import dataclass
 
-from app.database.repository import save_check_result
 from app.models.monitor import Monitor
-from app.services.checker import check_monitor
+from app.queue.producer import enqueue_monitor_check
 
 
 @dataclass
@@ -32,28 +31,17 @@ class Scheduler:
     async def execute_monitor(self, scheduled_monitor: ScheduledMonitor) -> None:
         monitor = scheduled_monitor.monitor
         try:
-            print(f"Checking {monitor.name}...")
-            result = await check_monitor(monitor)
-
             if monitor.id is None:
                 raise RuntimeError(
                     f"{monitor.name} has no database ID"
                 )
 
-            await save_check_result(
-                monitor_id=monitor.id,
-                check_result=result,
-            )
+            message_id = await enqueue_monitor_check(monitor.id)
 
-            status = "UP" if result.success else "DOWN"
-            print(
-                f"{monitor.name}: "
-                f"{status} - "
-                f"{result.latency_ms:.2f}ms"
-            )
-
-            if result.error is not None:
-                print(f"{monitor.name} error: {result.error}")
+            if message_id is None:
+                print(f"{monitor.name} already has an outstanding job")
+            else:
+                print(f"Queued {monitor.name} as Redis job {message_id}")
         finally: 
             scheduled_monitor.running = False
 

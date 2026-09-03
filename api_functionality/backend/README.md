@@ -16,12 +16,12 @@ INCIDENT ENGINE
 [ ] Incident history
 
 DISTRIBUTED SYSTEM
-[ ] Redis Stream
-[ ] Scheduler producer
-[ ] Worker consumer
-[ ] Multiple workers
-[ ] ACK/retry
-[ ] Duplicate protection
+[x] Redis Stream
+[x] Scheduler producer
+[x] Worker consumer
+[x] Multiple workers
+[x] ACK/retry
+[x] Duplicate protection
 
 FRONTEND
 [ ] Monitor list
@@ -67,10 +67,10 @@ Scheduler that runs monitors repeatedly
 STEP 4 -- Done
 PostgreSQL persistence
 
-STEP 5 -- Working
+STEP 5 -- Done
 FastAPI REST API
 
-STEP 6
+STEP 6 -- Done
 Background workers / Redis queue
 
 STEP 7
@@ -85,4 +85,34 @@ React dashboard
 STEP 10
 Docker + deployment + monitoringSTEP 1 ✅
 HTTP checker
+
+
+REDIS WORKER DEVELOPMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Detailed design, failure semantics, and troubleshooting:
+
+    docs/redis-workers.md
+
+From the backend directory, start PostgreSQL and Redis:
+
+    docker compose up -d
+
+Start the scheduler producer in one terminal:
+
+    ..\.venv\Scripts\python.exe -m app.scheduler_main
+
+Start one or more workers in separate terminals:
+
+    ..\.venv\Scripts\python.exe -m app.workers.monitor_worker --name worker-1
+    ..\.venv\Scripts\python.exe -m app.workers.monitor_worker --name worker-2
+
+Every worker joins the same Redis consumer group. Redis gives each queued
+message to one worker, and the worker acknowledges it only after the check
+result and incident processing complete.
+
+Run the Redis connectivity and queue integration tests:
+
+    $env:RUN_REDIS_TESTS = "1"
+    ..\.venv\Scripts\python.exe -m unittest -v tests.test_redis_integration tests.test_redis_queue_integration
 

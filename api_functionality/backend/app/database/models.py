@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -70,6 +71,11 @@ class MonitorDB(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    incidents: Mapped[list["IncidentDB"]] = relationship(
+        back_populates="monitor",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class CheckResultDB(Base):
@@ -107,4 +113,90 @@ class CheckResultDB(Base):
 
     monitor: Mapped["MonitorDB"] = relationship(
         back_populates="check_results",
+    )
+
+
+class IncidentDB(Base):
+    __tablename__ = "incidents"
+
+    __table_args__ = (
+        CheckConstraint(
+            "failure_count >= 1",
+            name="ck_incidents_failure_count_positive",
+        ),
+
+        CheckConstraint(
+            "resolved_at IS NULL OR resolved_at >= started_at",
+            name="ck_incidents_resolved_after_started",
+        ),
+        CheckConstraint(
+            "last_failure_at >= started_at",
+            name="ck_incidents_last_failure_after_started",
+        ),
+
+        CheckConstraint(
+            """
+            (status = 'OPEN' AND resolved_at IS NULL)
+            OR
+            (status = 'RESOLVED' AND resolved_at IS NOT NULL)
+            """,
+            name="ck_incidents_status_resolution",
+        ),
+
+        Index(
+            "ix_incidents_monitor_started_at",
+            "monitor_id",
+            "started_at",
+        ),
+
+        Index(
+            "uq_incidents_one_open_per_monitor",
+            "monitor_id",
+            unique=True,
+            postgresql_where=text("status = 'OPEN'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        Identity(),
+        primary_key=True,
+    )
+
+    monitor_id: Mapped[int] = mapped_column(
+        ForeignKey("monitors.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    last_failure_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=text("'OPEN'"),
+    )
+    failure_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("1"),
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    monitor: Mapped["MonitorDB"] = relationship(
+        back_populates="incidents",
     )

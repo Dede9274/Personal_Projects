@@ -1,7 +1,7 @@
 import unittest
 
 from app.database.base import Base
-from app.database.models import CheckResultDB, MonitorDB
+from app.database.models import CheckResultDB, IncidentDB, MonitorDB
 from app.models.monitor import Monitor
 
 
@@ -20,10 +20,11 @@ class ModelTests(unittest.TestCase):
     def test_orm_tables_are_registered(self):
         self.assertEqual(
             set(Base.metadata.tables),
-            {"monitors", "check_results"},
+            {"monitors", "check_results", "incidents"},
         )
         self.assertEqual(MonitorDB.__tablename__, "monitors")
         self.assertEqual(CheckResultDB.__tablename__, "check_results")
+        self.assertEqual(IncidentDB.__tablename__, "incidents")
 
     def test_nullable_result_columns(self):
         table = CheckResultDB.__table__
@@ -42,6 +43,38 @@ class ModelTests(unittest.TestCase):
             indexes["ix_check_results_monitor_checked_at"],
             ("monitor_id", "checked_at"),
         )
+
+    def test_incident_columns_and_monitor_foreign_key(self):
+        table = IncidentDB.__table__
+        monitor_foreign_key = next(iter(table.c.monitor_id.foreign_keys))
+
+        self.assertTrue(table.c.resolved_at.nullable)
+        self.assertTrue(table.c.last_error.nullable)
+        self.assertFalse(table.c.monitor_id.nullable)
+        self.assertFalse(table.c.last_failure_at.nullable)
+        self.assertEqual(monitor_foreign_key.target_fullname, "monitors.id")
+        self.assertEqual(monitor_foreign_key.ondelete, "CASCADE")
+
+    def test_incident_indexes_exist(self):
+        indexes = {
+            index.name: tuple(column.name for column in index.columns)
+            for index in IncidentDB.__table__.indexes
+        }
+
+        self.assertEqual(
+            indexes["ix_incidents_monitor_started_at"],
+            ("monitor_id", "started_at"),
+        )
+        self.assertEqual(
+            indexes["uq_incidents_one_open_per_monitor"],
+            ("monitor_id",),
+        )
+        unique_index = next(
+            index
+            for index in IncidentDB.__table__.indexes
+            if index.name == "uq_incidents_one_open_per_monitor"
+        )
+        self.assertTrue(unique_index.unique)
 
 
 if __name__ == "__main__":
