@@ -10,6 +10,7 @@ from app.database.repository import (
     get_active_monitor,
     save_check_result,
 )
+from app.models.incident import IncidentStatus
 from app.queue.connection import (
     check_redis_connection,
     close_redis_connection,
@@ -17,6 +18,9 @@ from app.queue.connection import (
 from app.queue.worker import MonitorStreamWorker
 from app.services.checker import check_monitor
 from app.services.incident_service import process_check_result
+from app.services.notification_service import (
+    enqueue_incident_opened_notifications,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -41,10 +45,31 @@ async def execute_monitor_job(monitor_id: int) -> None:
         monitor_id=monitor_id,
         check_result=result,
     )
-    await process_check_result(
+    incident = await process_check_result(
         monitor_id=monitor_id,
         check_result=result,
     )
+
+    # The incident service returns the existing OPEN incident for every
+    # additional failure. Per-channel Redis locks make these calls retry-safe
+    # while allowing only one email and one webhook for the incident.
+    if (
+        incident is not None
+        and incident.status == IncidentStatus.OPEN.value
+    ):
+        queued_notifications = await enqueue_incident_opened_notifications(
+            incident_id=incident.id,
+            monitor_id=monitor_id,
+        )
+
+        for channel, message_id in queued_notifications.items():
+            if message_id is not None:
+                logger.info(
+                    "Queued %s notification %s for incident %s",
+                    channel.value,
+                    message_id,
+                    incident.id,
+                )
 
     state = "UP" if result.success else "DOWN"
     logger.info(

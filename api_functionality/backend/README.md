@@ -93,6 +93,7 @@ REDIS WORKER DEVELOPMENT
 Detailed design, failure semantics, and troubleshooting:
 
     docs/redis-workers.md
+    docs/notifications.md
 
 From the backend directory, start PostgreSQL and Redis:
 
@@ -106,6 +107,10 @@ Start one or more workers in separate terminals:
 
     ..\.venv\Scripts\python.exe -m app.workers.monitor_worker --name worker-1
     ..\.venv\Scripts\python.exe -m app.workers.monitor_worker --name worker-2
+
+Start the email/webhook notification worker in another terminal:
+
+    ..\.venv\Scripts\python.exe -m app.workers.notification_worker --name notification-1
 
 Every worker joins the same Redis consumer group. Redis gives each queued
 message to one worker, and the worker acknowledges it only after the check

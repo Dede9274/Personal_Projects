@@ -411,3 +411,13 @@ async def update_incident(
         await session.refresh(incident)
 
     return incident
+
+async def get_monitor_by_id(monitor_id: int) -> Monitor | None:
+    """Return one monitor regardless of its active state."""
+    async with async_session_factory() as session:
+        monitor_db = await session.get(MonitorDB, monitor_id)
+
+    if monitor_db is None:
+        return None
+
+    return _monitor_to_domain(monitor_db)

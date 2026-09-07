@@ -11,13 +11,9 @@ from app.services.scheduler import Scheduler
 
 async def main() -> None:
     try:
-        monitors = await get_active_monitors()
-
-        if not monitors:
-            print("No active monitors found")
-            return
-
-        scheduler = Scheduler(monitors)
+        # The scheduler owns the refresh loop. It remains alive when the
+        # database is empty and notices API changes without a restart.
+        scheduler = Scheduler(monitor_loader=get_active_monitors)
         await scheduler.run()
     finally:
         await close_redis_connection()

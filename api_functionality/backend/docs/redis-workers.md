@@ -2,8 +2,8 @@
 
 ## What changed
 
-The scheduler no longer performs HTTP checks itself. The system now has three
-separate roles:
+The scheduler no longer performs HTTP checks itself. Monitor checking and
+incident notification delivery run as separate worker roles:
 
 ```text
 
@@ -22,6 +22,14 @@ Monitor workers
     +--> call check_monitor()
     +--> save CheckResult
     +--> call process_check_result()
+    +--> enqueue email/webhook notification jobs for OPEN incidents
+    +--> acknowledge the Redis message
+
+Notification workers
+    |
+    +--> consume one channel-specific notification job
+    +--> load monitor and incident data from PostgreSQL
+    +--> send email or webhook
     +--> acknowledge the Redis message
 ```
 
@@ -40,8 +48,12 @@ configuration or results are stored.
 | `app/queue/worker.py` | Implements consumer groups, ownership heartbeats, ACK, retry, stale-job recovery, and dead-lettering. |
 | `app/workers/monitor_worker.py` | Contains the monitor-specific job handler and worker command-line entry point. |
 | `app/services/scheduler.py` | Decides when monitors are due and asks the producer to enqueue them. |
-| `app/scheduler_main.py` | Loads active monitors and runs the producer scheduler. |
+| `app/scheduler_main.py` | Runs the producer scheduler with a recurring PostgreSQL monitor loader. |
 | `app/database/repository.py` | Lets a worker load one active monitor by ID. |
+| `app/queue/notification_producer.py` | Atomically deduplicates notification jobs per incident and channel. |
+| `app/queue/notification_worker.py` | Delivers notification jobs with retry, stale-job recovery, and dead-lettering. |
+| `app/workers/notification_worker.py` | Dispatches notification jobs to the email or webhook sender. |
+| `docs/notifications.md` | Documents channel configuration, payloads, and operation. |
 
 ## Redis keys and message data
 
@@ -53,6 +65,10 @@ The implementation uses these Redis keys:
 | `monitor-workers` | Consumer group shared by every monitor worker. |
 | `uptime:monitor-check:outstanding:{monitor_id}` | Duplicate-protection key for one monitor. |
 | `uptime:monitor-checks:dead` | Jobs that failed on all three attempts or were malformed. |
+| `uptime:notifications` | Channel-specific incident notification jobs. |
+| `notification-workers` | Consumer group shared by notification workers. |
+| `uptime:notification:incident-opened:{incident_id}:{channel}` | Per-channel notification deduplication and final state. |
+| `uptime:notifications:dead` | Notifications that exhausted their retries. |
 
 A new message begins with only the data a worker needs to locate current
 configuration:
@@ -274,8 +290,11 @@ ACK removes completed work, and the monitor can be scheduled again afterward.
 
 ## Current limitations and next improvements
 
-1. The scheduler loads active monitors only at startup. Restart it after adding,
-   deleting, activating, or deactivating monitors.
+1. The scheduler reloads active monitors from PostgreSQL every five seconds.
+   New and reactivated monitors are scheduled immediately, interval changes
+   start a new cadence, and inactive or deleted monitors are removed from the
+   in-memory schedule. A database refresh failure keeps the last known schedule
+   and is retried rather than stopping the service.
 2. Delivery is at least once, not exactly once. Add a database-backed unique
    job ID for full result idempotency.
 3. Retries happen immediately. A delayed retry stream or sorted set could add

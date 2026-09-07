@@ -20,6 +20,7 @@ from app.database.repository import (
     get_incidents,
     get_incidents_for_monitor,
     get_open_incidents,
+    get_monitor_by_id,
     increment_incident,
     resolve_incident,
     save_check_result,
@@ -190,6 +191,30 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
             monitor = await get_active_monitor(99)
 
         self.assertIsNone(monitor)
+
+    async def test_get_monitor_by_id_includes_inactive_monitor(self):
+        row = MonitorDB(
+            id=7,
+            name="Paused monitor",
+            url="https://paused.example.test",
+            interval_seconds=30,
+            timeout_seconds=5,
+            expected_status_code=200,
+            is_active=False,
+        )
+        session = FakeSession(rows=[row])
+
+        with patch(
+            "app.database.repository.async_session_factory",
+            return_value=session,
+        ):
+            monitor = await get_monitor_by_id(7)
+
+        self.assertIsNotNone(monitor)
+        self.assertEqual(monitor.id, 7)
+        self.assertEqual(monitor.name, "Paused monitor")
+        self.assertEqual(session.get_call[0], MonitorDB)
+        self.assertEqual(session.get_call[1], 7)
 
     async def test_save_and_read_check_results(self):
         checked_at = datetime.now(timezone.utc)
