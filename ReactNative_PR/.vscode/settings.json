@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "queue": "c",
+        "xiosbase": "c",
+        "05_canvas.h": "c",
+        "stdio.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.autocompleteAddParentheses": true
+}
