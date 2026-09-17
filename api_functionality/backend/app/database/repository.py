@@ -4,6 +4,11 @@ from sqlalchemy import select
 
 from app.database.connection import async_session_factory
 from app.database.models import CheckResultDB, IncidentDB, MonitorDB
+from app.models.incident import (
+    ACTIVE_INCIDENT_STATUSES,
+    IncidentStatus,
+    IncidentTransitionError,
+)
 from app.models.monitor import CheckResult, Monitor
 
 
@@ -15,6 +20,7 @@ def _monitor_to_domain(monitor_db: MonitorDB) -> Monitor:
         interval_seconds=monitor_db.interval_seconds,
         timeout_seconds=monitor_db.timeout_seconds,
         expected_status_code=monitor_db.expected_status_code,
+        purpose=monitor_db.purpose,
     )
 
 
@@ -34,6 +40,7 @@ async def create_monitor(
     interval_seconds: int,
     timeout_seconds: float,
     expected_status_code: int = 200,
+    purpose: str = "",
 ) -> Monitor:
     monitor_db = MonitorDB(
         name=name,
@@ -41,6 +48,7 @@ async def create_monitor(
         interval_seconds=interval_seconds,
         timeout_seconds=timeout_seconds,
         expected_status_code=expected_status_code,
+        purpose=purpose,
     )
 
     async with async_session_factory() as session:
@@ -141,10 +149,10 @@ async def get_check_results(
 
 
 async def get_active_incident(monitor_id: int) -> IncidentDB | None:
-    """Return the currently open incident for one monitor, if present."""
+    """Return the unresolved incident for one monitor, if present."""
     statement = select(IncidentDB).where(
         IncidentDB.monitor_id == monitor_id,
-        IncidentDB.status == "OPEN",
+        IncidentDB.status.in_(ACTIVE_INCIDENT_STATUSES),
     )
 
     async with async_session_factory() as session:
@@ -189,10 +197,10 @@ async def get_incidents_for_monitor(
 
 
 async def get_open_incidents() -> list[IncidentDB]:
-    """Return all currently open incidents, newest first."""
+    """Return all unresolved incidents, including investigations."""
     statement = (
         select(IncidentDB)
-        .where(IncidentDB.status == "OPEN")
+        .where(IncidentDB.status.in_(ACTIVE_INCIDENT_STATUSES))
         .order_by(IncidentDB.started_at.desc())
     )
 
@@ -235,8 +243,8 @@ async def resolve_incident(
 ) -> IncidentDB | None:
     statement = select(IncidentDB).where(
         IncidentDB.monitor_id == monitor_id,
-        IncidentDB.status == "OPEN",
-    )
+        IncidentDB.status.in_(ACTIVE_INCIDENT_STATUSES),
+    ).with_for_update()
 
     async with async_session_factory() as session:
         result = await session.execute(statement)
@@ -245,7 +253,7 @@ async def resolve_incident(
         if incident is None:
             return None
 
-        incident.status = "RESOLVED"
+        incident.status = IncidentStatus.RESOLVED.value
         incident.resolved_at = resolved_at
 
         try:
@@ -268,7 +276,7 @@ async def increment_incident(
         select(IncidentDB)
         .where(
             IncidentDB.id == incident_id,
-            IncidentDB.status == "OPEN",
+            IncidentDB.status.in_(ACTIVE_INCIDENT_STATUSES),
         )
         .with_for_update()
     )
@@ -323,11 +331,12 @@ async def update_incident(
     if "status" in changes:
         status = changes["status"]
 
-        if not isinstance(status, str) or status not in {
-            "OPEN",
-            "RESOLVED",
-        }:
-            raise ValueError("status must be OPEN or RESOLVED")
+        valid_statuses = {status.value for status in IncidentStatus}
+
+        if not isinstance(status, str) or status not in valid_statuses:
+            raise ValueError(
+                "status must be OPEN, INVESTIGATING, or RESOLVED"
+            )
 
     if "last_error" in changes:
         last_error = changes["last_error"]
@@ -369,22 +378,33 @@ async def update_incident(
         if incident is None:
             return None
 
-        was_resolved = incident.status == "RESOLVED"
+        was_resolved = incident.status == IncidentStatus.RESOLVED.value
 
         try:
             for field_name, new_value in changes.items():
                 setattr(incident, field_name, new_value)
 
-            if was_resolved and incident.status == "OPEN":
+            if (
+                was_resolved
+                and incident.status != IncidentStatus.RESOLVED.value
+            ):
                 raise ValueError(
                     "A resolved incident cannot be reopened; "
                     "create a new incident instead"
                 )
 
-            if incident.status == "OPEN" and incident.resolved_at is not None:
-                raise ValueError("An OPEN incident cannot have resolved_at")
+            if (
+                incident.status in ACTIVE_INCIDENT_STATUSES
+                and incident.resolved_at is not None
+            ):
+                raise ValueError(
+                    "An active incident cannot have resolved_at"
+                )
 
-            if incident.status == "RESOLVED" and incident.resolved_at is None:
+            if (
+                incident.status == IncidentStatus.RESOLVED.value
+                and incident.resolved_at is None
+            ):
                 raise ValueError("A RESOLVED incident requires resolved_at")
 
             if incident.last_failure_at < incident.started_at:
@@ -409,6 +429,66 @@ async def update_incident(
         # Refresh after a successful commit. A refresh failure cannot undo
         # an update that PostgreSQL has already committed.
         await session.refresh(incident)
+
+    return incident
+
+
+async def transition_incident_status(
+    incident_id: int,
+    new_status: IncidentStatus,
+    *,
+    transitioned_at: datetime | None = None,
+) -> IncidentDB | None:
+    """Persist one lifecycle transition while locking the incident row."""
+    if not isinstance(new_status, IncidentStatus):
+        raise TypeError("new_status must be an IncidentStatus")
+
+    if transitioned_at is None:
+        transitioned_at = datetime.now(timezone.utc)
+
+    if (
+        transitioned_at.tzinfo is None
+        or transitioned_at.utcoffset() is None
+    ):
+        raise ValueError("transitioned_at must be timezone-aware")
+
+    async with async_session_factory() as session:
+        incident = await session.get(
+            IncidentDB,
+            incident_id,
+            with_for_update=True,
+        )
+
+        if incident is None:
+            return None
+
+        current_status = IncidentStatus(incident.status)
+        if current_status is new_status:
+            return incident
+
+        if current_status is IncidentStatus.RESOLVED:
+            raise IncidentTransitionError(
+                "A resolved incident cannot be reopened; "
+                "a later outage creates a new incident"
+            )
+
+        if new_status is IncidentStatus.RESOLVED:
+            if transitioned_at < incident.last_failure_at:
+                raise IncidentTransitionError(
+                    "An incident cannot be resolved before its last failure"
+                )
+            incident.resolved_at = transitioned_at
+        else:
+            incident.resolved_at = None
+
+        incident.status = new_status.value
+
+        try:
+            await session.commit()
+            await session.refresh(incident)
+        except Exception:
+            await session.rollback()
+            raise
 
     return incident
 

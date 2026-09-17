@@ -33,6 +33,9 @@ class ModelTests(unittest.TestCase):
         self.assertTrue(table.c.error.nullable)
         self.assertFalse(table.c.latency_ms.nullable)
 
+    def test_monitor_purpose_is_required(self):
+        self.assertFalse(MonitorDB.__table__.c.purpose.nullable)
+
     def test_composite_result_index_exists(self):
         indexes = {
             index.name: tuple(column.name for column in index.columns)
@@ -66,15 +69,17 @@ class ModelTests(unittest.TestCase):
             ("monitor_id", "started_at"),
         )
         self.assertEqual(
-            indexes["uq_incidents_one_open_per_monitor"],
+            indexes["uq_incidents_one_active_per_monitor"],
             ("monitor_id",),
         )
         unique_index = next(
             index
             for index in IncidentDB.__table__.indexes
-            if index.name == "uq_incidents_one_open_per_monitor"
+            if index.name == "uq_incidents_one_active_per_monitor"
         )
         self.assertTrue(unique_index.unique)
+        predicate = str(unique_index.dialect_options["postgresql"]["where"])
+        self.assertIn("INVESTIGATING", predicate)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Read-only HTTP endpoints for incidents."""
+"""HTTP endpoints for reading and managing incidents."""
 
 from typing import Annotated
 
@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Path, status
 
 from app.database import repository
 from app.database.models import IncidentDB
-from app.schemas.incident import IncidentResponse
+from app.models.incident import IncidentTransitionError
+from app.schemas.incident import IncidentResponse, IncidentStatusUpdate
 
 
 router = APIRouter(tags=["incidents"])
@@ -42,6 +43,35 @@ async def list_open_incidents() -> list[IncidentDB]:
 async def get_incident(incident_id: IncidentId) -> IncidentDB:
     """Return one incident using the incident's ID."""
     incident = await repository.get_incident(incident_id)
+
+    if incident is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident {incident_id} was not found",
+        )
+
+    return incident
+
+
+@router.patch(
+    "/incidents/{incident_id}",
+    response_model=IncidentResponse,
+)
+async def update_incident_status(
+    incident_id: IncidentId,
+    data: IncidentStatusUpdate,
+) -> IncidentDB:
+    """Persist a valid manual incident status transition."""
+    try:
+        incident = await repository.transition_incident_status(
+            incident_id,
+            data.status,
+        )
+    except IncidentTransitionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
 
     if incident is None:
         raise HTTPException(

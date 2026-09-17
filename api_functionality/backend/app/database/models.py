@@ -46,6 +46,11 @@ class MonitorDB(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(Text, nullable=False)
+    purpose: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("''"),
+    )
     interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     timeout_seconds: Mapped[float] = mapped_column(Float, nullable=False)
     expected_status_code: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -136,7 +141,10 @@ class IncidentDB(Base):
 
         CheckConstraint(
             """
-            (status = 'OPEN' AND resolved_at IS NULL)
+            (
+                status IN ('OPEN', 'INVESTIGATING')
+                AND resolved_at IS NULL
+            )
             OR
             (status = 'RESOLVED' AND resolved_at IS NOT NULL)
             """,
@@ -150,10 +158,12 @@ class IncidentDB(Base):
         ),
 
         Index(
-            "uq_incidents_one_open_per_monitor",
+            "uq_incidents_one_active_per_monitor",
             "monitor_id",
             unique=True,
-            postgresql_where=text("status = 'OPEN'"),
+            postgresql_where=text(
+                "status IN ('OPEN', 'INVESTIGATING')"
+            ),
         ),
     )
 

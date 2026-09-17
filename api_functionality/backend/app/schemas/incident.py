@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict
 from app.models.incident import IncidentStatus
 
 
+class IncidentStatusUpdate(BaseModel):
+    """A user-requested incident lifecycle transition."""
+
+    status: IncidentStatus
+
+
 class IncidentResponse(BaseModel):
     """Complete incident representation returned by the API."""
 

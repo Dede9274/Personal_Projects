@@ -16,12 +16,12 @@ INCIDENT ENGINE
 [ ] Incident history
 
 DISTRIBUTED SYSTEM
-[x] Redis Stream
-[x] Scheduler producer
-[x] Worker consumer
-[x] Multiple workers
-[x] ACK/retry
-[x] Duplicate protection
+[ ] Redis Stream
+[ ] Scheduler producer
+[ ] Worker consumer
+[ ] Multiple workers
+[ ] ACK/retry
+[ ] Duplicate protection
 
 FRONTEND
 [ ] Monitor list
@@ -73,10 +73,10 @@ FastAPI REST API
 STEP 6 -- Done
 Background workers / Redis queue
 
-STEP 7
+STEP 7 -- Done
 Incident detection
 
-STEP 8
+STEP 8 -- Done
 Notifications
 
 STEP 9
@@ -86,7 +86,6 @@ STEP 10
 Docker + deployment + monitoringSTEP 1 ✅
 HTTP checker
 
-
 REDIS WORKER DEVELOPMENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -95,9 +94,32 @@ Detailed design, failure semantics, and troubleshooting:
     docs/redis-workers.md
     docs/notifications.md
 
-From the backend directory, start PostgreSQL and Redis:
+From the backend directory, start PostgreSQL, Redis, the migration job,
+the scheduler, and a monitor worker:
 
-    docker compose up -d
+    docker compose up -d --build
+
+Confirm that checks are being scheduled and processed:
+
+    docker compose ps
+    docker compose logs -f scheduler monitor-worker
+
+The scheduler and monitor worker are separate long-running services. Starting
+only FastAPI and the frontend does not perform checks; those processes only
+manage and display monitoring data.
+
+For local development without the Dockerized Python services, start only the
+infrastructure first:
+
+    .\start_monitoring.ps1
+
+This one command starts PostgreSQL and Redis, applies Alembic migrations, and
+runs the scheduler plus one worker in the foreground. Keep that terminal open;
+its output shows every queued and completed check. Press Ctrl+C to stop it.
+
+You can still start every process manually when debugging:
+
+    docker compose up -d postgres redis
 
 Start the scheduler producer in one terminal:
 
@@ -120,4 +142,3 @@ Run the Redis connectivity and queue integration tests:
 
     $env:RUN_REDIS_TESTS = "1"
     ..\.venv\Scripts\python.exe -m unittest -v tests.test_redis_integration tests.test_redis_queue_integration
-

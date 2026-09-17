@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.database.connection import async_session_factory, engine
 from app.database.models import CheckResultDB, IncidentDB, MonitorDB
 from app.database.repository import create_incident, increment_incident
+from app.services.monitor_service import list_monitor_checks
 
 
 if sys.platform == "win32":
@@ -53,6 +54,70 @@ class DatabaseIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(stored_result)
             self.assertEqual(stored_result.monitor_id, monitor.id)
             self.assertEqual(stored_result.status_code, 200)
+
+            await session.rollback()
+
+    async def test_monitor_check_history_is_filtered_limited_and_newest_first(self):
+        async with async_session_factory() as session:
+            monitor = MonitorDB(
+                name="Check History Integration Test",
+                url="https://history.example.test",
+                interval_seconds=30,
+                timeout_seconds=5,
+                expected_status_code=200,
+            )
+            other_monitor = MonitorDB(
+                name="Other Check History Monitor",
+                url="https://other-history.example.test",
+                interval_seconds=30,
+                timeout_seconds=5,
+                expected_status_code=200,
+            )
+            session.add_all([monitor, other_monitor])
+            await session.flush()
+
+            checked_at = datetime.now(timezone.utc)
+            older_result = CheckResultDB(
+                monitor_id=monitor.id,
+                checked_at=checked_at - timedelta(seconds=30),
+                status_code=503,
+                latency_ms=40,
+                success=False,
+                error="Expected status 200, got 503",
+            )
+            newest_result = CheckResultDB(
+                monitor_id=monitor.id,
+                checked_at=checked_at,
+                status_code=200,
+                latency_ms=20,
+                success=True,
+                error=None,
+            )
+            unrelated_result = CheckResultDB(
+                monitor_id=other_monitor.id,
+                checked_at=checked_at + timedelta(seconds=30),
+                status_code=200,
+                latency_ms=10,
+                success=True,
+                error=None,
+            )
+            session.add_all([
+                older_result,
+                newest_result,
+                unrelated_result,
+            ])
+            await session.flush()
+
+            results = await list_monitor_checks(
+                session,
+                monitor.id,
+                limit=1,
+            )
+
+            self.assertIsNotNone(results)
+            result_ids = [result.id for result in results]
+            self.assertEqual(result_ids, [newest_result.id])
+            self.assertNotIn(unrelated_result.id, result_ids)
 
             await session.rollback()
 

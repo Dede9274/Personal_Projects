@@ -1,8 +1,9 @@
 #Business and database operations for monitor management.
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database.models import MonitorDB
+from app.database.models import CheckResultDB, MonitorDB
 from app.schemas.monitor import MonitorCreate, MonitorUpdate
+
 
 async def _save_monitor(session: AsyncSession, monitor: MonitorDB) -> None:
     try:
@@ -30,6 +31,32 @@ async def list_monitors(session: AsyncSession,) -> list[MonitorDB]:
 
 async def get_monitor(session: AsyncSession, monitor_id: int,) -> MonitorDB | None:
     return await session.get(MonitorDB, monitor_id)
+
+
+async def list_monitor_checks(
+    session: AsyncSession,
+    monitor_id: int,
+    limit: int,
+) -> list[CheckResultDB] | None:
+    """Return one monitor's latest checks, or None if it does not exist."""
+    monitor = await get_monitor(session, monitor_id)
+
+    if monitor is None:
+        return None
+
+    statement = (
+        select(CheckResultDB)
+        .where(CheckResultDB.monitor_id == monitor_id)
+        .order_by(
+            CheckResultDB.checked_at.desc(),
+            CheckResultDB.id.desc(),
+        )
+        .limit(limit)
+    )
+
+    result = await session.scalars(statement)
+    return list(result.all())
+
 
 async def update_monitor(session: AsyncSession, monitor_id: int, data: MonitorUpdate,) -> MonitorDB | None:
     monitor = await get_monitor(session, monitor_id)

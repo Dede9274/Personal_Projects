@@ -1,6 +1,6 @@
 import os
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 if os.getenv("RUN_DATABASE_TESTS") != "1":
@@ -24,8 +24,10 @@ from app.database.repository import (
     increment_incident,
     resolve_incident,
     save_check_result,
+    transition_incident_status,
     update_incident,
 )
+from app.models.incident import IncidentStatus, IncidentTransitionError
 from app.models.monitor import CheckResult
 
 
@@ -627,6 +629,92 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         self.assertTrue(session.rolled_back)
+
+    async def test_transition_open_incident_to_investigating(self):
+        started_at = datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc)
+        row = IncidentDB(
+            id=3,
+            monitor_id=7,
+            started_at=started_at,
+            last_failure_at=started_at,
+            resolved_at=None,
+            status="OPEN",
+            failure_count=3,
+            last_error="Timeout",
+        )
+        session = FakeSession(rows=[row])
+
+        with patch(
+            "app.database.repository.async_session_factory",
+            return_value=session,
+        ):
+            updated = await transition_incident_status(
+                3,
+                IncidentStatus.INVESTIGATING,
+            )
+
+        self.assertIs(updated, row)
+        self.assertEqual(row.status, "INVESTIGATING")
+        self.assertIsNone(row.resolved_at)
+        self.assertTrue(session.committed)
+
+    async def test_transition_investigating_incident_to_resolved(self):
+        started_at = datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc)
+        resolved_at = started_at + timedelta(minutes=12)
+        row = IncidentDB(
+            id=3,
+            monitor_id=7,
+            started_at=started_at,
+            last_failure_at=started_at + timedelta(minutes=10),
+            resolved_at=None,
+            status="INVESTIGATING",
+            failure_count=5,
+            last_error="Timeout",
+        )
+        session = FakeSession(rows=[row])
+
+        with patch(
+            "app.database.repository.async_session_factory",
+            return_value=session,
+        ):
+            updated = await transition_incident_status(
+                3,
+                IncidentStatus.RESOLVED,
+                transitioned_at=resolved_at,
+            )
+
+        self.assertIs(updated, row)
+        self.assertEqual(row.status, "RESOLVED")
+        self.assertEqual(row.resolved_at, resolved_at)
+        self.assertTrue(session.committed)
+
+    async def test_transition_resolved_incident_is_terminal(self):
+        started_at = datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc)
+        resolved_at = started_at + timedelta(minutes=12)
+        row = IncidentDB(
+            id=3,
+            monitor_id=7,
+            started_at=started_at,
+            last_failure_at=started_at + timedelta(minutes=10),
+            resolved_at=resolved_at,
+            status="RESOLVED",
+            failure_count=5,
+            last_error="Timeout",
+        )
+        session = FakeSession(rows=[row])
+
+        with patch(
+            "app.database.repository.async_session_factory",
+            return_value=session,
+        ):
+            with self.assertRaises(IncidentTransitionError):
+                await transition_incident_status(
+                    3,
+                    IncidentStatus.INVESTIGATING,
+                )
+
+        self.assertEqual(row.status, "RESOLVED")
+        self.assertFalse(session.committed)
 
 
 if __name__ == "__main__":

@@ -96,6 +96,30 @@ class IncidentServiceTests(unittest.IsolatedAsyncioTestCase):
             resolved_at=recovered_at,
         )
 
+    async def test_success_resolves_investigating_incident(self):
+        recovered_at = datetime.now(timezone.utc)
+        result = check_result(success=True, checked_at=recovered_at)
+        investigating_incident = incident(12)
+        investigating_incident.status = "INVESTIGATING"
+
+        with (
+            patch(
+                "app.services.incident_service.get_active_incident",
+                AsyncMock(return_value=investigating_incident),
+            ),
+            patch(
+                "app.services.incident_service.resolve_incident",
+                AsyncMock(return_value=investigating_incident),
+            ) as resolve_mock,
+        ):
+            processed_incident = await process_check_result(7, result)
+
+        self.assertIs(processed_incident, investigating_incident)
+        resolve_mock.assert_awaited_once_with(
+            monitor_id=7,
+            resolved_at=recovered_at,
+        )
+
     async def test_failure_increments_existing_open_incident(self):
         failed_at = datetime.now(timezone.utc)
         result = check_result(
@@ -125,6 +149,40 @@ class IncidentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(processed_incident, incremented_incident)
         increment_mock.assert_awaited_once_with(
             incident_id=11,
+            last_error="Connection refused",
+            last_failure_at=failed_at,
+        )
+        history_mock.assert_not_awaited()
+
+    async def test_failure_increments_investigating_incident(self):
+        failed_at = datetime.now(timezone.utc)
+        result = check_result(
+            success=False,
+            checked_at=failed_at,
+            error="Connection refused",
+        )
+        investigating_incident = incident(12)
+        investigating_incident.status = "INVESTIGATING"
+
+        with (
+            patch(
+                "app.services.incident_service.get_active_incident",
+                AsyncMock(return_value=investigating_incident),
+            ),
+            patch(
+                "app.services.incident_service.increment_incident",
+                AsyncMock(return_value=investigating_incident),
+            ) as increment_mock,
+            patch(
+                "app.services.incident_service.get_check_results",
+                AsyncMock(),
+            ) as history_mock,
+        ):
+            processed_incident = await process_check_result(7, result)
+
+        self.assertIs(processed_incident, investigating_incident)
+        increment_mock.assert_awaited_once_with(
+            incident_id=12,
             last_error="Connection refused",
             last_failure_at=failed_at,
         )

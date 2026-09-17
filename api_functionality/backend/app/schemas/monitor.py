@@ -28,6 +28,13 @@ PositiveTimeout = Annotated[
     Field(gt=0, allow_inf_nan=False),
 ]
 HttpStatusCode = Annotated[int, Field(ge=100, le=599)]
+MonitorPurpose = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        max_length=1000,
+    ),
+]
 
 
 class MonitorCreate(BaseModel):
@@ -37,6 +44,7 @@ class MonitorCreate(BaseModel):
 
     name: MonitorName
     url: HttpUrl
+    purpose: MonitorPurpose = ""
     interval_seconds: PositiveInterval
     timeout_seconds: PositiveTimeout
     expected_status_code: HttpStatusCode = 200
@@ -50,6 +58,7 @@ class MonitorUpdate(BaseModel):
 
     name: MonitorName | None = None
     url: HttpUrl | None = None
+    purpose: MonitorPurpose | None = None
     interval_seconds: PositiveInterval | None = None
     timeout_seconds: PositiveTimeout | None = None
     expected_status_code: HttpStatusCode | None = None
@@ -89,6 +98,7 @@ class MonitorRead(BaseModel):
     id: int
     name: str
     url: HttpUrl
+    purpose: str
     interval_seconds: int
     timeout_seconds: float
     expected_status_code: int

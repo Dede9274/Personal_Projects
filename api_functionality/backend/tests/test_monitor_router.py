@@ -4,9 +4,10 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi import FastAPI
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from app.database.connection import get_session
-from app.database.models import MonitorDB
+from app.database.models import CheckResultDB, MonitorDB
 from app.routers.monitors import router
 
 
@@ -16,12 +17,28 @@ def make_monitor(monitor_id: int = 1) -> MonitorDB:
         id=monitor_id,
         name="Google",
         url="https://google.com",
+        purpose="Search engine availability",
         interval_seconds=30,
         timeout_seconds=5,
         expected_status_code=200,
         is_active=True,
         created_at=now,
         updated_at=now,
+    )
+
+
+def make_check_result(
+    result_id: int = 10,
+    monitor_id: int = 1,
+) -> CheckResultDB:
+    return CheckResultDB(
+        id=result_id,
+        monitor_id=monitor_id,
+        checked_at=datetime.now(timezone.utc),
+        status_code=200,
+        latency_ms=25.5,
+        success=True,
+        error=None,
     )
 
 
@@ -86,6 +103,178 @@ class MonitorRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             response.json(),
             {"detail": "Monitor 99 was not found"},
+        )
+
+    async def test_list_monitor_checks_returns_empty_history(self):
+        with patch(
+            "app.routers.monitors.monitor_service.list_monitor_checks",
+            AsyncMock(return_value=[]),
+        ) as list_mock:
+            response = await self.client.get("/monitors/1/checks")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])
+        list_mock.assert_awaited_once_with(self.session, 1, 500)
+
+    async def test_list_monitor_checks_serializes_results(self):
+        check_result = make_check_result()
+
+        with patch(
+            "app.routers.monitors.monitor_service.list_monitor_checks",
+            AsyncMock(return_value=[check_result]),
+        ) as list_mock:
+            response = await self.client.get("/monitors/1/checks?limit=25")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()[0],
+            {
+                "id": 10,
+                "monitor_id": 1,
+                "checked_at": check_result.checked_at.isoformat().replace(
+                    "+00:00",
+                    "Z",
+                ),
+                "status_code": 200,
+                "latency_ms": 25.5,
+                "success": True,
+                "error": None,
+            },
+        )
+        list_mock.assert_awaited_once_with(self.session, 1, 25)
+
+    async def test_list_monitor_checks_returns_404_when_monitor_is_missing(self):
+        with patch(
+            "app.routers.monitors.monitor_service.list_monitor_checks",
+            AsyncMock(return_value=None),
+        ):
+            response = await self.client.get("/monitors/99/checks")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Monitor 99 was not found"},
+        )
+
+    async def test_list_monitor_checks_rejects_an_invalid_limit(self):
+        with patch(
+            "app.routers.monitors.monitor_service.list_monitor_checks",
+            AsyncMock(),
+        ) as list_mock:
+            response = await self.client.get("/monitors/1/checks?limit=501")
+
+        self.assertEqual(response.status_code, 422)
+        list_mock.assert_not_awaited()
+
+    async def test_run_monitor_check_queues_an_extra_check(self):
+        with (
+            patch(
+                "app.routers.monitors.monitor_service.get_monitor",
+                AsyncMock(return_value=make_monitor()),
+            ) as get_mock,
+            patch(
+                "app.routers.monitors.enqueue_monitor_check",
+                AsyncMock(return_value="123-0"),
+            ) as enqueue_mock,
+        ):
+            response = await self.client.post("/monitors/1/checks")
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(
+            response.json(),
+            {
+                "monitor_id": 1,
+                "status": "queued",
+                "job_id": "123-0",
+            },
+        )
+        get_mock.assert_awaited_once_with(self.session, 1)
+        enqueue_mock.assert_awaited_once_with(1)
+
+    async def test_run_monitor_check_reports_an_outstanding_check(self):
+        with (
+            patch(
+                "app.routers.monitors.monitor_service.get_monitor",
+                AsyncMock(return_value=make_monitor()),
+            ),
+            patch(
+                "app.routers.monitors.enqueue_monitor_check",
+                AsyncMock(return_value=None),
+            ) as enqueue_mock,
+        ):
+            response = await self.client.post("/monitors/1/checks")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "monitor_id": 1,
+                "status": "already_outstanding",
+                "job_id": None,
+            },
+        )
+        enqueue_mock.assert_awaited_once_with(1)
+
+    async def test_run_monitor_check_returns_404_when_monitor_is_missing(self):
+        with (
+            patch(
+                "app.routers.monitors.monitor_service.get_monitor",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.routers.monitors.enqueue_monitor_check",
+                AsyncMock(),
+            ) as enqueue_mock,
+        ):
+            response = await self.client.post("/monitors/99/checks")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Monitor 99 was not found"},
+        )
+        enqueue_mock.assert_not_awaited()
+
+    async def test_run_monitor_check_rejects_an_inactive_monitor(self):
+        monitor = make_monitor()
+        monitor.is_active = False
+
+        with (
+            patch(
+                "app.routers.monitors.monitor_service.get_monitor",
+                AsyncMock(return_value=monitor),
+            ),
+            patch(
+                "app.routers.monitors.enqueue_monitor_check",
+                AsyncMock(),
+            ) as enqueue_mock,
+        ):
+            response = await self.client.post("/monitors/1/checks")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Monitor 1 is inactive"},
+        )
+        enqueue_mock.assert_not_awaited()
+
+    async def test_run_monitor_check_returns_503_when_queue_is_unavailable(self):
+        with (
+            patch(
+                "app.routers.monitors.monitor_service.get_monitor",
+                AsyncMock(return_value=make_monitor()),
+            ),
+            patch(
+                "app.routers.monitors.enqueue_monitor_check",
+                AsyncMock(side_effect=RedisConnectionError("offline")),
+            ),
+        ):
+            response = await self.client.post("/monitors/1/checks")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json(),
+            {"detail": "The monitor-check queue is unavailable"},
         )
 
     async def test_update_monitor_returns_updated_monitor(self):

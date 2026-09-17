@@ -8,6 +8,7 @@ class Monitor:
     interval_seconds: int
     timeout_seconds: float
     expected_status_code: int = 200
+    purpose: str = ""
     id: int | None = None
 
 @dataclass

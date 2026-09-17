@@ -8,7 +8,10 @@ async def check_monitor(monitor: Monitor) -> CheckResult:
     start_time = time.perf_counter()
 
     try:
-        async with httpx.AsyncClient() as client:
+        # Many healthy sites redirect from a bare domain to their canonical
+        # URL or from a protected page to a login page. Judge the final HTTP
+        # response instead of incorrectly treating that redirect as downtime.
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(
                 monitor.url,
                 timeout=monitor.timeout_seconds,

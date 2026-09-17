@@ -21,8 +21,20 @@ class MonitorSchemaTests(unittest.TestCase):
         )
 
         self.assertEqual(monitor.name, "Google")
+        self.assertEqual(monitor.purpose, "")
         self.assertEqual(monitor.expected_status_code, 200)
         self.assertTrue(monitor.is_active)
+
+    def test_create_strips_purpose_whitespace(self):
+        monitor = MonitorCreate(
+            name="Google",
+            url="https://google.com",
+            purpose="  Search engine availability  ",
+            interval_seconds=30,
+            timeout_seconds=5,
+        )
+
+        self.assertEqual(monitor.purpose, "Search engine availability")
 
     def test_create_rejects_invalid_values(self):
         invalid_values = (
@@ -83,6 +95,7 @@ class MonitorSchemaTests(unittest.TestCase):
             id=7,
             name="Google",
             url="https://google.com",
+            purpose="Search engine availability",
             interval_seconds=30,
             timeout_seconds=5,
             expected_status_code=200,
@@ -95,6 +108,7 @@ class MonitorSchemaTests(unittest.TestCase):
 
         self.assertEqual(response.id, 7)
         self.assertEqual(response.name, "Google")
+        self.assertEqual(response.purpose, "Search engine availability")
         self.assertEqual(str(response.url), "https://google.com/")
         self.assertEqual(response.created_at, now)
 
