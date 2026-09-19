@@ -1,93 +1,9 @@
-DISTRIBUTED UPTIME MONITOR
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Backend development
 
-CORE
-[ ] HTTP checker
-[ ] Monitor CRUD
-[ ] PostgreSQL
-[ ] Automatic scheduling
-[ ] Check history
+The backend provides the FastAPI application, PostgreSQL persistence,
+scheduled monitor checks, incident detection, and email or webhook delivery.
 
-INCIDENT ENGINE
-[ ] Consecutive failures
-[ ] DOWN transition
-[ ] Incident creation
-[ ] Recovery
-[ ] Incident history
-
-DISTRIBUTED SYSTEM
-[ ] Redis Stream
-[ ] Scheduler producer
-[ ] Worker consumer
-[ ] Multiple workers
-[ ] ACK/retry
-[ ] Duplicate protection
-
-FRONTEND
-[ ] Monitor list
-[ ] Monitor creation
-[ ] Monitor details
-[ ] Latency graph
-[ ] Incident history
-[ ] Dashboard statistics
-
-ADVANCED
-[ ] Alerts
-[ ] Public status page
-[ ] Remote agent
-[ ] Agent heartbeat
-[ ] Multiple regions
-
-ENGINEERING
-[ ] Unit tests
-[ ] Integration tests
-[ ] Docker
-[ ] Docker Compose
-[ ] CI
-[ ] Load testing
-[ ] Prometheus
-[ ] Deployment
-
-FINAL
-[ ] Architecture diagram
-[ ] README
-[ ] Screenshots
-[ ] Demo video
-[ ] Resume description
-
-STEP 1 -- Done
-HTTP checker
-
-STEP 2 -- Done
-Monitor + CheckResult models
-
-STEP 3 -- Done
-Scheduler that runs monitors repeatedly
-
-STEP 4 -- Done
-PostgreSQL persistence
-
-STEP 5 -- Done
-FastAPI REST API
-
-STEP 6 -- Done
-Background workers / Redis queue
-
-STEP 7 -- Done
-Incident detection
-
-STEP 8 -- Done
-Notifications
-
-STEP 9
-React dashboard
-
-STEP 10
-Docker + deployment + monitoringSTEP 1 ✅
-HTTP checker
-
-REDIS WORKER DEVELOPMENT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## Redis workers
 
 Detailed design, failure semantics, and troubleshooting:
 

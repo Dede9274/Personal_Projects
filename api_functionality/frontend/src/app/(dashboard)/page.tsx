@@ -1,10 +1,7 @@
 import DashboardAutoRefresh from "@/components/dashboard/DashboardAutoRefresh";
 import MonitorStatusChart from "@/components/dashboard/MonitorStatusChart";
 import MonitorTable from "@/components/dashboard/MonitorTable";
-import type {
-  DashboardMonitorHealth,
-  DashboardMonitorRow,
-} from "@/components/dashboard/MonitorTable";
+import type { DashboardMonitorRow } from "@/components/dashboard/MonitorTable";
 import RecentIncidents from "@/components/dashboard/RecentIncidents";
 import type { IncidentNotification } from "@/components/dashboard/RecentIncidents";
 import ResponseTimeChart from "@/components/dashboard/ResponseTimeChart";
@@ -13,6 +10,7 @@ import { getIncidents } from "@/lib/api/incidents";
 import { getMonitorChecks, getMonitors } from "@/lib/api/monitors";
 import { formatBerlinChartTime } from "@/lib/dateTime";
 import type { CheckResult, Incident, Monitor } from "@/lib/api/types";
+import { getMonitorHealth } from "@/lib/monitorHealth";
 
 export const dynamic = "force-dynamic";
 
@@ -48,28 +46,6 @@ function getGreeting(now: Date): string {
   if (hour < 12) return "Good morning!";
   if (hour < 18) return "Good afternoon!";
   return "Good evening!";
-}
-
-function getMonitorHealth(
-  monitor: Monitor,
-  latestCheck: CheckResult | null,
-  checksLoaded: boolean,
-  now: number,
-): DashboardMonitorHealth {
-  if (!monitor.is_active) return "paused";
-  if (!checksLoaded) return "unavailable";
-  if (latestCheck === null) return "awaiting";
-
-  const checkedAt = Date.parse(latestCheck.checked_at);
-  if (Number.isNaN(checkedAt)) return "unavailable";
-
-  const expectedCheckWindowMs = Math.max(
-    monitor.interval_seconds * 3 * 1_000,
-    30_000,
-  );
-
-  if (now - checkedAt > expectedCheckWindowMs) return "delayed";
-  return latestCheck.success ? "up" : "down";
 }
 
 function buildResponseTimeData(

@@ -12,8 +12,8 @@ export default function Sidebar() {
         : pathname === href || pathname.startsWith(`${href}/`);
 
     return active
-      ? "rounded-lg bg-slate-700 px-4 py-3 text-[15px] font-medium text-white shadow-sm"
-      : "rounded-lg px-4 py-3 text-[15px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white";
+      ? "select-none rounded-lg bg-slate-700 px-4 py-3 text-[15px] font-medium text-white caret-transparent shadow-sm"
+      : "select-none rounded-lg px-4 py-3 text-[15px] font-medium text-slate-300 caret-transparent hover:bg-slate-800 hover:text-white";
   };
 
   return (

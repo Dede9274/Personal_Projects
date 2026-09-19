@@ -1,9 +1,14 @@
 import MonitorTable from "@/components/monitors/MonitorTable";
+import type { MonitorTableRow } from "@/components/monitors/MonitorTable";
 import MonitorToolbar from "@/components/monitors/MonitorToolbar";
-import { getMonitors } from "@/lib/api/monitors";
+import DashboardAutoRefresh from "@/components/dashboard/DashboardAutoRefresh";
+import { getMonitorChecks, getMonitors } from "@/lib/api/monitors";
 import type { Monitor } from "@/lib/api/types";
+import { getMonitorHealth } from "@/lib/monitorHealth";
 
 export const dynamic = "force-dynamic";
+
+const MONITOR_CHECK_LIMIT = 500;
 
 type MonitorsPageProps = {
   searchParams: Promise<{
@@ -74,6 +79,33 @@ export default async function MonitorsPage({ searchParams }: MonitorsPageProps) 
   }
 
   const visibleMonitors = filterAndSortMonitors(monitors, query, status, sort);
+  const nowDate = new Date();
+  const now = nowDate.getTime();
+  const checkResults = await Promise.allSettled(
+    visibleMonitors.map((monitor) =>
+      getMonitorChecks(monitor.id, { limit: MONITOR_CHECK_LIMIT }),
+    ),
+  );
+  const monitorRows: MonitorTableRow[] = visibleMonitors.map(
+    (monitor, index) => {
+      const checkResult = checkResults[index];
+      const checksLoaded = checkResult?.status === "fulfilled";
+      const checks = checksLoaded ? checkResult.value : [];
+      const latestCheck = checks[0] ?? null;
+      const successfulChecks = checks.filter((check) => check.success).length;
+
+      return {
+        monitor,
+        latestCheck,
+        checksLoaded,
+        health: getMonitorHealth(monitor, latestCheck, checksLoaded, now),
+        recentUptime:
+          checks.length === 0
+            ? null
+            : (successfulChecks / checks.length) * 100,
+      };
+    },
+  );
   const activeCount = monitors.filter((monitor) => monitor.is_active).length;
   const pausedCount = monitors.length - activeCount;
   const activePercentage =
@@ -81,6 +113,8 @@ export default async function MonitorsPage({ searchParams }: MonitorsPageProps) 
 
   return (
     <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <DashboardAutoRefresh />
+
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h1 className="text-[32px] leading-tight font-bold tracking-tight text-slate-900 sm:text-[34px]">
@@ -142,7 +176,8 @@ export default async function MonitorsPage({ searchParams }: MonitorsPageProps) 
         </section>
       ) : (
         <MonitorTable
-          monitors={visibleMonitors}
+          rows={monitorRows}
+          now={now}
           hasFilters={query.trim().length > 0 || status !== "all"}
         />
       )}

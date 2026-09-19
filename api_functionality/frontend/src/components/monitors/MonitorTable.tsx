@@ -4,12 +4,59 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import ActionMenu from "@/components/ui/ActionMenu";
 import { deleteMonitor, updateMonitor } from "@/lib/api/monitors";
-import type { Monitor } from "@/lib/api/types";
+import type { CheckResult, Monitor } from "@/lib/api/types";
+import type { MonitorHealth } from "@/lib/monitorHealth";
+
+export type MonitorTableRow = {
+  monitor: Monitor;
+  latestCheck: CheckResult | null;
+  checksLoaded: boolean;
+  health: MonitorHealth;
+  recentUptime: number | null;
+};
 
 type MonitorTableProps = {
-  monitors: Monitor[];
+  rows: MonitorTableRow[];
+  now: number;
   hasFilters?: boolean;
+};
+
+const healthStyles: Record<
+  MonitorHealth,
+  { label: string; badge: string; dot: string }
+> = {
+  up: {
+    label: "Up",
+    badge: "bg-emerald-100 text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  down: {
+    label: "Down",
+    badge: "bg-red-100 text-red-700",
+    dot: "bg-red-500",
+  },
+  paused: {
+    label: "Paused",
+    badge: "bg-amber-100 text-amber-700",
+    dot: "bg-amber-500",
+  },
+  awaiting: {
+    label: "Awaiting",
+    badge: "bg-slate-100 text-slate-600",
+    dot: "bg-slate-400",
+  },
+  delayed: {
+    label: "Delayed",
+    badge: "bg-orange-100 text-orange-700",
+    dot: "bg-orange-500",
+  },
+  unavailable: {
+    label: "Unavailable",
+    badge: "bg-slate-100 text-slate-600",
+    dot: "bg-slate-400",
+  },
 };
 
 function formatInterval(seconds: number): string {
@@ -29,8 +76,42 @@ function getInitials(name: string): string {
     .join("");
 }
 
+function formatLatency(latencyMs: number): string {
+  return `${latencyMs.toLocaleString("en-GB", {
+    maximumFractionDigits: 0,
+  })} ms`;
+}
+
+function formatUptime(uptime: number): string {
+  const digits = uptime === 100 || uptime === 0 ? 0 : 1;
+  return `${uptime.toFixed(digits)}%`;
+}
+
+function formatRelativeTime(value: string, now: number): string {
+  const checkedAt = Date.parse(value);
+  if (Number.isNaN(checkedAt)) return "Unknown";
+
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((now - checkedAt) / 1_000),
+  );
+
+  if (elapsedSeconds < 10) return "just now";
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`;
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default function MonitorTable({
-  monitors,
+  rows,
+  now,
   hasFilters = false,
 }: MonitorTableProps) {
   const router = useRouter();
@@ -81,10 +162,10 @@ export default function MonitorTable({
     <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex min-h-14 items-center justify-between gap-4 border-b border-slate-200 px-5 py-3">
         <p className="text-sm text-slate-500">
-          {monitors.length} {monitors.length === 1 ? "monitor" : "monitors"}
+          {rows.length} {rows.length === 1 ? "monitor" : "monitors"}
         </p>
         <p className="text-xs text-slate-400">
-          Health metrics will appear after the check-results API is connected.
+          Health metrics use up to the latest 500 persisted checks.
         </p>
       </div>
 
@@ -100,16 +181,16 @@ export default function MonitorTable({
             <tr>
               <th className="px-5 py-3 font-medium">Name</th>
               <th className="px-3 py-3 font-medium">URL</th>
-              <th className="px-3 py-3 font-medium">Monitoring</th>
+              <th className="px-3 py-3 font-medium">Status</th>
               <th className="px-3 py-3 font-medium">Response Time</th>
-              <th className="px-3 py-3 font-medium">Uptime (30d)</th>
+              <th className="px-3 py-3 font-medium">Recent Uptime</th>
               <th className="px-3 py-3 font-medium">Check Interval</th>
               <th className="px-3 py-3 font-medium">Last Checked</th>
               <th className="w-20 px-5 py-3 text-center font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 text-slate-700">
-            {monitors.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-5 py-14 text-center">
                   <p className="font-semibold text-slate-900">
@@ -129,8 +210,9 @@ export default function MonitorTable({
                 </td>
               </tr>
             ) : (
-              monitors.map((monitor) => {
+              rows.map(({ monitor, latestCheck, checksLoaded, health, recentUptime }) => {
                 const isBusy = busyMonitorId === monitor.id;
+                const styles = healthStyles[health];
 
                 return (
                   <tr key={monitor.id} className="transition hover:bg-slate-50/80">
@@ -159,56 +241,63 @@ export default function MonitorTable({
                     </td>
                     <td className="px-3 py-3">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          monitor.is_active
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles.badge}`}
                       >
                         <span
                           aria-hidden="true"
-                          className={`size-2 rounded-full ${
-                            monitor.is_active ? "bg-blue-500" : "bg-amber-500"
-                          }`}
+                          className={`size-2 rounded-full ${styles.dot}`}
                         />
-                        {monitor.is_active ? "Active" : "Paused"}
+                        {styles.label}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-slate-400" title="Check-result summary endpoint not implemented">
-                      —
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {latestCheck === null
+                        ? "—"
+                        : formatLatency(latestCheck.latency_ms)}
                     </td>
-                    <td className="px-3 py-3 text-slate-400" title="Uptime summary endpoint not implemented">
-                      —
+                    <td
+                      className="whitespace-nowrap px-3 py-3"
+                      title="Calculated from up to the latest 500 persisted checks"
+                    >
+                      {recentUptime === null ? "—" : formatUptime(recentUptime)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3">
                       {formatInterval(monitor.interval_seconds)}
                     </td>
-                    <td className="px-3 py-3 text-slate-400" title="Latest-check endpoint not implemented">
-                      —
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-500">
+                      {!checksLoaded ? (
+                        "Unavailable"
+                      ) : latestCheck === null ? (
+                        "Never"
+                      ) : (
+                        <time
+                          dateTime={latestCheck.checked_at}
+                          title={new Date(latestCheck.checked_at).toISOString()}
+                        >
+                          {formatRelativeTime(latestCheck.checked_at, now)}
+                        </time>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-center">
-                      <details className="relative inline-block text-left">
-                        <summary
-                          aria-label={`Actions for ${monitor.name}`}
-                          className="flex size-8 cursor-pointer list-none items-center justify-center rounded-lg text-lg font-bold tracking-widest text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-600 [&::-webkit-details-marker]:hidden"
-                        >
-                          <span aria-hidden="true">•••</span>
-                        </summary>
-                        <div className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg">
+                      <div className="inline-flex">
+                        <ActionMenu label={`Actions for ${monitor.name}`} menuClassName="w-40">
                           <Link
                             href={`/monitors/${monitor.id}`}
+                            role="menuitem"
                             className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                           >
                             View details
                           </Link>
                           <Link
                             href={`/monitors/${monitor.id}/edit`}
+                            role="menuitem"
                             className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                           >
                             Edit
                           </Link>
                           <button
                             type="button"
+                            role="menuitem"
                             disabled={isBusy}
                             onClick={() => toggleMonitor(monitor)}
                             className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
@@ -217,14 +306,15 @@ export default function MonitorTable({
                           </button>
                           <button
                             type="button"
+                            role="menuitem"
                             disabled={isBusy}
                             onClick={() => removeMonitor(monitor)}
                             className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:text-red-300"
                           >
                             Delete
                           </button>
-                        </div>
-                      </details>
+                        </ActionMenu>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -235,7 +325,7 @@ export default function MonitorTable({
       </div>
 
       <footer className="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">
-        Showing {monitors.length} {monitors.length === 1 ? "monitor" : "monitors"}
+        Showing {rows.length} {rows.length === 1 ? "monitor" : "monitors"}
       </footer>
     </section>
   );

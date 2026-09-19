@@ -46,7 +46,6 @@ class Scheduler:
         self.poll_interval_seconds = poll_interval_seconds
         self.next_refresh = current_time if monitor_loader is not None else None
 
-        # Create an empty set for asyncio tasks that don't return a value.
         self.active_tasks: set[asyncio.Task[None]] = set()
         self.running = False
 
@@ -89,7 +88,6 @@ class Scheduler:
             scheduled_monitor = existing_by_id.get(monitor.id)
 
             if scheduled_monitor is None:
-                # A newly created or reactivated monitor is checked promptly.
                 scheduled_monitor = ScheduledMonitor(
                     monitor=monitor,
                     next_run=current_time,
@@ -102,7 +100,6 @@ class Scheduler:
                 scheduled_monitor.monitor = monitor
 
                 if interval_changed:
-                    # Start a fresh cadence from the time the change is seen.
                     scheduled_monitor.next_run = (
                         current_time + monitor.interval_seconds
                     )
@@ -119,7 +116,6 @@ class Scheduler:
         monitors = await self.monitor_loader()
         self.reconcile_monitors(monitors)
 
-    # Execute task
     async def execute_monitor(self, scheduled_monitor: ScheduledMonitor) -> None:
         monitor = scheduled_monitor.monitor
         try:
@@ -137,7 +133,6 @@ class Scheduler:
         finally:
             scheduled_monitor.running = False
 
-    # Handle finished tasks
     def handle_finished_task(self, task: asyncio.Task[None]) -> None:
         self.active_tasks.discard(task)
         if task.cancelled():
@@ -146,7 +141,6 @@ class Scheduler:
         if error is not None:
             print(f"Unexpected task error {error}")
 
-    # Scheduler that handles which task runs next
     async def run(self) -> None:
         self.running = True
         print("Scheduler started")
@@ -180,7 +174,6 @@ class Scheduler:
                     if is_due and not scheduled_monitor.running:
                         monitor = scheduled_monitor.monitor
 
-                        # Update when this monitor should run next.
                         while scheduled_monitor.next_run <= current_time:
                             scheduled_monitor.next_run += monitor.interval_seconds
 
@@ -195,12 +188,10 @@ class Scheduler:
                             self.handle_finished_task
                         )
 
-                # Give tasks time to run and prevent constant CPU usage.
                 await asyncio.sleep(self.poll_interval_seconds)
         finally:
             self.running = False
 
-            #allowing checks that are already runnning to finish
             if self.active_tasks:
                 await asyncio.gather(
                     *tuple(self.active_tasks), return_exceptions=True

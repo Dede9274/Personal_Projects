@@ -1,19 +1,12 @@
 import Link from "next/link";
 
 import type { CheckResult, Monitor } from "@/lib/api/types";
-
-export type DashboardMonitorHealth =
-  | "up"
-  | "down"
-  | "paused"
-  | "awaiting"
-  | "delayed"
-  | "unavailable";
+import type { MonitorHealth } from "@/lib/monitorHealth";
 
 export type DashboardMonitorRow = {
   monitor: Monitor;
   latestCheck: CheckResult | null;
-  health: DashboardMonitorHealth;
+  health: MonitorHealth;
 };
 
 type MonitorTableProps = {
@@ -21,7 +14,7 @@ type MonitorTableProps = {
 };
 
 const healthStyles: Record<
-  DashboardMonitorHealth,
+  MonitorHealth,
   { label: string; badge: string; dot: string }
 > = {
   up: {

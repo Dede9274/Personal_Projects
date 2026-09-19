@@ -1,35 +1,45 @@
-#Business and database operations for monitor management.
+"""Business and persistence operations for monitors."""
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database.models import CheckResultDB, MonitorDB
 from app.schemas.monitor import MonitorCreate, MonitorUpdate
 
 
 async def _save_monitor(session: AsyncSession, monitor: MonitorDB) -> None:
     try:
-        await session.flush() #use flush instead of commit because it doesn't make changes permanent like commit() and can also be rolled back
+        await session.flush()
         await session.refresh(monitor)
         await session.commit()
     except Exception:
         await session.rollback()
         raise
- 
-async def create_monitor(session: AsyncSession, data: MonitorCreate) ->MonitorDB:
-    values = data.model_dump() #converts pudantic model object to a python dictionary
+
+
+async def create_monitor(
+    session: AsyncSession,
+    data: MonitorCreate,
+) -> MonitorDB:
+    values = data.model_dump()
     values["url"] = str(data.url)
 
-    monitor = MonitorDB(**values) # ** -> dictionary unpacking
+    monitor = MonitorDB(**values)
     session.add(monitor)
     await _save_monitor(session, monitor)
     return monitor
 
-async def list_monitors(session: AsyncSession,) -> list[MonitorDB]:
+
+async def list_monitors(session: AsyncSession) -> list[MonitorDB]:
     statement = select(MonitorDB).order_by(MonitorDB.id)
 
     result = await session.scalars(statement)
     return list(result.all())
 
-async def get_monitor(session: AsyncSession, monitor_id: int,) -> MonitorDB | None:
+async def get_monitor(
+    session: AsyncSession,
+    monitor_id: int,
+) -> MonitorDB | None:
     return await session.get(MonitorDB, monitor_id)
 
 
@@ -58,7 +68,11 @@ async def list_monitor_checks(
     return list(result.all())
 
 
-async def update_monitor(session: AsyncSession, monitor_id: int, data: MonitorUpdate,) -> MonitorDB | None:
+async def update_monitor(
+    session: AsyncSession,
+    monitor_id: int,
+    data: MonitorUpdate,
+) -> MonitorDB | None:
     monitor = await get_monitor(session, monitor_id)
 
     if monitor is None:
@@ -74,11 +88,11 @@ async def update_monitor(session: AsyncSession, monitor_id: int, data: MonitorUp
     await _save_monitor(session, monitor)
     return monitor
 
-async def delete_monitor(session: AsyncSession, monitor_id:int) -> bool:
+async def delete_monitor(session: AsyncSession, monitor_id: int) -> bool:
     monitor = await get_monitor(session, monitor_id)
 
-    if monitor is None: 
-        return None
+    if monitor is None:
+        return False
 
     try:
         await session.delete(monitor)
