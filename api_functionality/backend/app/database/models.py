@@ -10,8 +10,10 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    JSON,
     String,
     Text,
+    false,
     func,
     text,
     true,
@@ -115,6 +117,11 @@ class CheckResultDB(Base):
     latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    security_rejected: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=false(),
+    )
 
     monitor: Mapped["MonitorDB"] = relationship(
         back_populates="check_results",
@@ -209,4 +216,68 @@ class IncidentDB(Base):
 
     monitor: Mapped["MonitorDB"] = relationship(
         back_populates="incidents",
+    )
+
+
+class NotificationSettingsDB(Base):
+    __tablename__ = "notification_settings"
+
+    __table_args__ = (
+        CheckConstraint(
+            "id = 1",
+            name="ck_notification_settings_singleton",
+        ),
+        CheckConstraint(
+            "email_timeout_seconds > 0 "
+            "AND email_timeout_seconds <= 120",
+            name="ck_notification_settings_email_timeout",
+        ),
+        CheckConstraint(
+            "webhook_timeout_seconds > 0 "
+            "AND webhook_timeout_seconds <= 120",
+            name="ck_notification_settings_webhook_timeout",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=False,
+    )
+    email_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=false(),
+    )
+    email_recipients: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        server_default=text("'[]'"),
+    )
+    email_timeout_seconds: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default=text("10"),
+    )
+    webhook_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=false(),
+    )
+    webhook_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    webhook_timeout_seconds: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default=text("10"),
+    )
+    notify_incident_opened: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=true(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
     )

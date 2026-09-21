@@ -2,30 +2,27 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app.models.notification import NotificationChannel
 from app.notifications.config import (
     get_email_settings,
-    get_enabled_notification_channels,
+    get_smtp_configuration_status,
     get_webhook_settings,
 )
 
 
 class NotificationConfigTests(unittest.TestCase):
-    def test_enabled_channels_are_explicit(self):
+    def test_smtp_status_rejects_placeholder_configuration(self):
         with patch.dict(
             os.environ,
             {
-                "EMAIL_NOTIFICATIONS_ENABLED": "true",
-                "WEBHOOK_NOTIFICATIONS_ENABLED": "1",
+                "SMTP_HOST": "smtp.example.com",
+                "SMTP_FROM_EMAIL": "uptime@example.com",
             },
+            clear=True,
         ):
-            self.assertEqual(
-                get_enabled_notification_channels(),
-                [
-                    NotificationChannel.EMAIL,
-                    NotificationChannel.WEBHOOK,
-                ],
-            )
+            status = get_smtp_configuration_status()
+
+        self.assertFalse(status.configured)
+        self.assertIn("SMTP_HOST", status.error)
 
     def test_email_settings_parse_recipients_and_security(self):
         with patch.dict(
@@ -42,6 +39,7 @@ class NotificationConfigTests(unittest.TestCase):
                 ),
                 "SMTP_TIMEOUT_SECONDS": "12",
             },
+            clear=True,
         ):
             settings = get_email_settings()
 
@@ -61,6 +59,7 @@ class NotificationConfigTests(unittest.TestCase):
                 "WEBHOOK_SIGNING_SECRET": "secret",
                 "WEBHOOK_TIMEOUT_SECONDS": "8",
             },
+            clear=True,
         ):
             settings = get_webhook_settings()
 

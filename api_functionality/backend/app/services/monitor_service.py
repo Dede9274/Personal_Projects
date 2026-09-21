@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CheckResultDB, MonitorDB
 from app.schemas.monitor import MonitorCreate, MonitorUpdate
+from app.security.url_validator import validate_monitor_url
 
 
 async def _save_monitor(session: AsyncSession, monitor: MonitorDB) -> None:
@@ -21,6 +22,8 @@ async def create_monitor(
     session: AsyncSession,
     data: MonitorCreate,
 ) -> MonitorDB:
+    await validate_monitor_url(str(data.url))
+
     values = data.model_dump()
     values["url"] = str(data.url)
 
@@ -80,6 +83,7 @@ async def update_monitor(
 
     changes = data.model_dump(exclude_unset=True)
     if "url" in changes:
+        await validate_monitor_url(str(changes["url"]))
         changes["url"] = str(changes["url"])
 
     for field_name, value in changes.items():

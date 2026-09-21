@@ -23,40 +23,58 @@ notification worker
 Email and webhook use different jobs and different deduplication keys. If the
 webhook fails after email succeeds, only the webhook is retried.
 
-## Configuration
+## Email configuration
 
-Copy the relevant settings from `.env.example` into the private `.env` file.
+SMTP credentials remain in the private project-root `.env` file and are not
+stored in PostgreSQL or returned by the API. Configure the transport first:
 
 Email with STARTTLS, commonly on port 587:
 
 ```dotenv
-EMAIL_NOTIFICATIONS_ENABLED=true
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_SECURITY=starttls
 SMTP_USERNAME=your_username
 SMTP_PASSWORD=your_password_or_app_password
 SMTP_FROM_EMAIL=uptime@example.com
-ALERT_EMAIL_TO=owner@example.com,second@example.com
-SMTP_TIMEOUT_SECONDS=10
 ```
 
 Use `SMTP_SECURITY=ssl` for implicit TLS, commonly on port 465. Use `none`
 only for a trusted local development SMTP server. Username and password may
 both be blank when the SMTP server does not require authentication.
 
-Generic webhook:
+Recreate the API and workers after changing environment values:
 
-```dotenv
-WEBHOOK_NOTIFICATIONS_ENABLED=true
-ALERT_WEBHOOK_URL=https://example.com/webhooks/uptime
-WEBHOOK_BEARER_TOKEN=optional_bearer_token
-WEBHOOK_SIGNING_SECRET=optional_shared_secret
-WEBHOOK_TIMEOUT_SECONDS=10
+```bash
+docker compose up -d --build --force-recreate api monitor-worker notification-worker
 ```
 
-Each channel can be enabled or disabled independently. Secrets belong only in
-`.env`, which is ignored by Git.
+Open `http://localhost:3000/notifications`, enter one or more recipients,
+enable email notifications, and save. The page stores those preferences in
+PostgreSQL. Use **Send test email** to make a real SMTP delivery attempt before
+waiting for an incident.
+
+The dashboard and its API own these non-secret settings:
+
+- Email and webhook enabled state
+- Email recipients
+- Webhook URL
+- Email and webhook timeouts
+- Incident-opened event selection
+
+## Webhook configuration
+
+The webhook URL and enabled state are saved in the dashboard. Optional webhook
+credentials remain in `.env`:
+
+```dotenv
+WEBHOOK_BEARER_TOKEN=optional_bearer_token
+WEBHOOK_SIGNING_SECRET=optional_shared_secret
+```
+
+Each channel can be enabled or disabled independently. `.env` is ignored by
+Git; never commit SMTP passwords, app passwords, bearer tokens, or signing
+secrets.
 
 ## Webhook request
 

@@ -18,6 +18,7 @@ class CheckResultResponse(BaseModel):
     latency_ms: float
     success: bool
     error: str | None
+    security_rejected: bool
 
 
 class CheckEnqueueStatus(str, Enum):

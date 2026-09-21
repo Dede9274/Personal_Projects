@@ -9,6 +9,7 @@ API Checker separates its REST API, scheduler, check execution, and notification
 ## At a glance
 
 - Create, edit, pause, delete, and manually check HTTP monitors.
+- Reject private/local targets and validate every redirect before requests.
 - Configure the interval, timeout, and expected HTTP status per endpoint.
 - Track latency, success rate, uptime history, and recent check results.
 - Open an incident after three consecutive failures and resolve it on recovery.
@@ -70,7 +71,7 @@ PostgreSQL is always the source of truth. Redis holds temporary delivery state a
 | API | FastAPI, Pydantic 2 | Async endpoints, strict validation, generated OpenAPI documentation |
 | Data access | SQLAlchemy 2 async, Psycopg 3 | Explicit async persistence with PostgreSQL-native behavior |
 | Migrations | Alembic | Versioned, repeatable schema changes |
-| HTTP checks | HTTPX | Async requests, redirects, timeouts, and clear network exceptions |
+| HTTP checks | HTTPX | Async requests, manually validated redirects, timeouts, and clear network exceptions |
 | Job delivery | Redis 8 Streams | Consumer groups, pending-entry recovery, and lightweight horizontal scaling |
 | Database | PostgreSQL 18 | Durable relational state, constraints, indexes, and transactional writes |
 | Runtime | Python 3.11, Node.js 24 | Reproducible slim container images for the backend and frontend |
@@ -139,10 +140,14 @@ Important settings:
 | `POSTGRES_PORT` | `5433` | Host port mapped to PostgreSQL |
 | `REDIS_PORT` | `6379` | Host port mapped to Redis on `127.0.0.1` |
 | `FRONTEND_ORIGINS` | localhost origins | Origins permitted by FastAPI CORS |
-| `EMAIL_NOTIFICATIONS_ENABLED` | `false` | Enable incident email jobs |
-| `WEBHOOK_NOTIFICATIONS_ENABLED` | `false` | Enable incident webhook jobs |
+| `SMTP_HOST` | unset | SMTP server used for email delivery |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_SECURITY` | `starttls` | `starttls`, `ssl`, or `none` |
+| `SMTP_USERNAME` | unset | Optional SMTP account username |
+| `SMTP_PASSWORD` | unset | SMTP password or provider app password |
+| `SMTP_FROM_EMAIL` | unset | Sender shown on notification emails |
 
-SMTP supports `starttls`, `ssl`, and `none`. Webhooks can include a bearer token and an `X-Uptime-Signature` HMAC-SHA256 signature. See [notification configuration](backend/docs/notifications.md) for every setting and the webhook payload.
+Channel toggles, recipients, webhook URL, and delivery timeouts are saved from the **Notifications** page in PostgreSQL. SMTP credentials stay only in `.env` and are never returned to the browser. After configuring SMTP, recreate the backend services, save an email recipient in the dashboard, and use **Send test email** to verify delivery. Webhooks can include a bearer token and an `X-Uptime-Signature` HMAC-SHA256 signature. See [notification configuration](backend/docs/notifications.md) for the complete setup.
 
 ## Services
 
@@ -247,6 +252,12 @@ FastAPI is deliberately thin: routers validate HTTP input and delegate persisten
 
 Manual checks return `202 Accepted` with a Redis job ID. If a job for the monitor is already queued or running, the endpoint returns `200 OK` with `already_outstanding`; inactive monitors return `409 Conflict`.
 
+Monitor URLs must use `http://` or `https://`, cannot contain embedded
+credentials, and must resolve only to public Internet addresses. Creation and
+URL updates perform this check before persistence. The worker repeats it
+immediately before every request because DNS records can change after a monitor
+is saved.
+
 ### Incident endpoints
 
 | Method | Path | Behavior |
@@ -256,6 +267,14 @@ Manual checks return `202 Accepted` with a Redis job ID. If a job for the monito
 | `GET` | `/incidents/{id}` | Read one incident |
 | `PATCH` | `/incidents/{id}` | Apply a valid manual status transition |
 | `GET` | `/monitors/{id}/incidents` | List incident history for a monitor |
+
+### Notification endpoints
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `GET` | `/notification-settings` | Read persisted channel preferences and safe SMTP readiness details |
+| `PATCH` | `/notification-settings` | Save recipients, channel toggles, URLs, events, and timeouts |
+| `POST` | `/notification-settings/test-email` | Send a test message to the saved recipients |
 
 Example monitor:
 
@@ -288,7 +307,13 @@ sequenceDiagram
     S->>R: Atomic dedupe + XADD(monitor_id, attempt=1)
     R-->>W: XREADGROUP assigns one job
     W->>P: Load latest active monitor configuration
+    W->>W: Resolve and validate public target
     W->>T: HTTP GET with configured timeout
+    opt Redirect (maximum 5)
+        T-->>W: 301/302/303/307/308 + Location
+        W->>W: Resolve and validate redirect target
+        W->>T: Follow validated redirect
+    end
     T-->>W: Response or network error
     W->>P: Save CheckResult
     W->>P: Open, update, or resolve incident
@@ -316,6 +341,7 @@ The producer uses a Lua script to atomically check a per-monitor key, append the
 - Unexpected processing errors are retried up to three total attempts.
 - Exhausted or malformed messages move to a capped dead-letter stream.
 - An endpoint returning the wrong status is a valid completed check, not a queue failure.
+- Security-rejected targets are persisted as `Blocked`, but do not count as downtime or alter incident state.
 - Jobs are acknowledged only after persistence and incident processing complete.
 
 This is **at-least-once delivery**. If PostgreSQL commits and a worker crashes before the Redis acknowledgement, another worker can repeat the check. The outstanding key prevents concurrent scheduling, but it cannot make a PostgreSQL commit and Redis acknowledgement one transaction. A database-backed job ID or transactional outbox would be the next step for end-to-end idempotency.
@@ -325,7 +351,7 @@ This is **at-least-once delivery**. If PostgreSQL commits and a worker crashes b
 1. Each failed check is persisted.
 2. Three consecutive failures open one incident for that monitor.
 3. Later failures increment its count and update the latest error.
-4. Enabled email and webhook channels receive separate Redis jobs.
+4. Channels enabled on the Notifications page receive separate Redis jobs.
 5. Per-channel keys prevent duplicate alerts while allowing one channel to retry independently.
 6. The next successful check resolves the active incident automatically.
 
@@ -393,6 +419,7 @@ docker compose config --quiet
 | Redis Streams over an in-process queue | Consumer groups, pending entries, and stale-job recovery support multiple processes without introducing a larger task framework. |
 | One outstanding job per monitor | Prevents backlog growth when a target responds more slowly than its interval. The cadence skips overlap instead of queueing every missed run. |
 | Load monitor configuration in the worker | Queued jobs use the newest URL, timeout, and active state. Redis messages stay small, at the cost of one database read per job. |
+| Validate outbound targets at write and execution time | API validation gives immediate feedback; worker validation protects against later DNS changes. Automatic redirects are disabled, each destination is resolved and checked, and redirect chains stop after five hops. Rejected checks remain auditable without opening incidents. |
 | Three failures before opening an incident | Suppresses short transient failures. It intentionally delays alerting by up to three check intervals. |
 | Resolve on the first successful recovery check | Recovery is reflected quickly and the invariant of one active incident per monitor stays simple. |
 | Database constraints enforce invariants | Positive timing values, valid status codes, consistent resolution timestamps, and one active incident per monitor survive application bugs and concurrency. |
@@ -411,6 +438,7 @@ api_functionality/
 │   │   ├── queue/               # Redis producers and stream consumers
 │   │   ├── routers/             # FastAPI monitor and incident routes
 │   │   ├── schemas/             # Pydantic API contracts
+│   │   ├── security/            # outbound URL and resolved-IP policy
 │   │   ├── services/            # checking, scheduling, incidents, notifications
 │   │   └── workers/             # standalone worker entry points
 │   ├── docs/                    # detailed backend design notes
@@ -428,4 +456,11 @@ api_functionality/
 
 ## Current scope
 
-API Checker is designed for trusted self-hosted environments. Authentication, per-user authorization, TLS termination, Redis authentication/TLS, metrics export, and a transactional notification outbox are not implemented yet. Put the application behind an authenticated reverse proxy and keep PostgreSQL and Redis private before exposing it beyond local development.
+API Checker includes application-layer SSRF defenses for monitor checks, but
+network egress rules remain the strongest backstop against DNS rebinding and
+resolver/connect race conditions. Authentication, per-user authorization, TLS
+termination, Redis authentication/TLS, metrics export, and a transactional
+notification outbox are not implemented yet. Put the application behind an
+authenticated reverse proxy, keep PostgreSQL and Redis private, and restrict
+worker egress before exposing it beyond local development. See
+[outbound request security](backend/docs/outbound-request-security.md).

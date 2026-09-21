@@ -71,7 +71,13 @@ async def execute_monitor_job(monitor_id: int) -> None:
                     incident.id,
                 )
 
-    state = "UP" if result.success else "DOWN"
+    state = (
+        "REJECTED"
+        if result.security_rejected
+        else "UP"
+        if result.success
+        else "DOWN"
+    )
     logger.info(
         "%s: %s - %.2fms",
         monitor.name,

@@ -207,6 +207,9 @@ export default async function Home() {
 
   const upCount = monitorRows.filter((row) => row.health === "up").length;
   const downCount = monitorRows.filter((row) => row.health === "down").length;
+  const blockedCount = monitorRows.filter(
+    (row) => row.health === "blocked",
+  ).length;
   const pausedCount = monitorRows.filter(
     (row) => row.health === "paused",
   ).length;
@@ -338,6 +341,7 @@ export default async function Home() {
         <MonitorStatusChart
           up={upCount}
           down={downCount}
+          blocked={blockedCount}
           paused={pausedCount}
           pending={pendingCount}
         />

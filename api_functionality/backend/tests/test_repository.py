@@ -9,7 +9,12 @@ if os.getenv("RUN_DATABASE_TESTS") != "1":
         "postgresql+psycopg://test:test@localhost:5432/test",
     )
 
-from app.database.models import CheckResultDB, IncidentDB, MonitorDB
+from app.database.models import (
+    CheckResultDB,
+    IncidentDB,
+    MonitorDB,
+    NotificationSettingsDB,
+)
 from app.database.repository import (
     create_incident,
     create_monitor,
@@ -21,14 +26,17 @@ from app.database.repository import (
     get_incidents_for_monitor,
     get_open_incidents,
     get_monitor_by_id,
+    get_notification_preferences,
     increment_incident,
     resolve_incident,
     save_check_result,
     transition_incident_status,
     update_incident,
+    update_notification_preferences,
 )
 from app.models.incident import IncidentStatus, IncidentTransitionError
 from app.models.monitor import CheckResult
+from app.models.notification import NotificationPreferences
 
 
 class FakeScalarResult:
@@ -102,6 +110,74 @@ class FakeSession:
 
 
 class RepositoryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_get_notification_preferences_maps_singleton_row(self):
+        updated_at = datetime.now(timezone.utc)
+        row = NotificationSettingsDB(
+            id=1,
+            email_enabled=True,
+            email_recipients=["alerts@example.test"],
+            email_timeout_seconds=12,
+            webhook_enabled=False,
+            webhook_url=None,
+            webhook_timeout_seconds=8,
+            notify_incident_opened=True,
+            updated_at=updated_at,
+        )
+        session = FakeSession(rows=[row])
+
+        with patch(
+            "app.database.repository.async_session_factory",
+            return_value=session,
+        ):
+            preferences = await get_notification_preferences()
+
+        self.assertEqual(
+            preferences.email_recipients,
+            ("alerts@example.test",),
+        )
+        self.assertEqual(preferences.email_timeout_seconds, 12)
+        self.assertEqual(session.get_call, (NotificationSettingsDB, 1, {}))
+
+    async def test_update_notification_preferences_replaces_values(self):
+        updated_at = datetime.now(timezone.utc)
+        row = NotificationSettingsDB(
+            id=1,
+            email_enabled=False,
+            email_recipients=[],
+            email_timeout_seconds=10,
+            webhook_enabled=False,
+            webhook_url=None,
+            webhook_timeout_seconds=10,
+            notify_incident_opened=True,
+            updated_at=updated_at,
+        )
+        session = FakeSession(rows=[row])
+        requested = NotificationPreferences(
+            email_enabled=True,
+            email_recipients=("alerts@example.test",),
+            email_timeout_seconds=15,
+            webhook_enabled=True,
+            webhook_url="https://hooks.example.test/uptime",
+            webhook_timeout_seconds=9,
+            notify_incident_opened=True,
+            updated_at=updated_at,
+        )
+
+        with patch(
+            "app.database.repository.async_session_factory",
+            return_value=session,
+        ):
+            saved = await update_notification_preferences(requested)
+
+        self.assertTrue(saved.email_enabled)
+        self.assertEqual(row.email_recipients, ["alerts@example.test"])
+        self.assertEqual(row.webhook_url, requested.webhook_url)
+        self.assertTrue(session.committed)
+        self.assertEqual(
+            session.get_call,
+            (NotificationSettingsDB, 1, {"with_for_update": True}),
+        )
+
     async def test_create_monitor_returns_domain_monitor(self):
         session = FakeSession()
 
@@ -238,6 +314,7 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
         saved = write_session.added[0]
         self.assertIsInstance(saved, CheckResultDB)
         self.assertEqual(saved.monitor_id, 7)
+        self.assertFalse(saved.security_rejected)
         self.assertTrue(write_session.committed)
 
         row = CheckResultDB(
@@ -248,6 +325,7 @@ class RepositoryTests(unittest.IsolatedAsyncioTestCase):
             latency_ms=42.5,
             success=True,
             error=None,
+            security_rejected=False,
         )
         read_session = FakeSession(rows=[row])
 

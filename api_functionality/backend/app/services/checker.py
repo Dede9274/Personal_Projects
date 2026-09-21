@@ -1,24 +1,87 @@
+"""Perform monitor checks while enforcing the outbound request policy."""
+
 import time
 from datetime import datetime, timezone
+from urllib.parse import urljoin
+
 import httpx
-from app.models.monitor import Monitor, CheckResult
+
+from app.models.monitor import CheckResult, Monitor
+from app.security.url_validator import (
+    MonitorUrlRejectedError,
+    validate_monitor_url,
+)
+
+
+MAX_REDIRECTS = 5
+REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
+
+
+def _result(
+    start_time: float,
+    *,
+    status_code: int | None,
+    success: bool,
+    error: str | None,
+    security_rejected: bool = False,
+) -> CheckResult:
+    return CheckResult(
+        status_code=status_code,
+        latency_ms=(time.perf_counter() - start_time) * 1000,
+        success=success,
+        error=error,
+        checked_at=datetime.now(timezone.utc),
+        security_rejected=security_rejected,
+    )
+
+
+async def _get_with_validated_redirects(
+    client: httpx.AsyncClient,
+    url: str,
+    timeout_seconds: float,
+) -> httpx.Response:
+    current_url = url
+
+    for redirect_count in range(MAX_REDIRECTS + 1):
+        await validate_monitor_url(current_url)
+        response = await client.get(
+            current_url,
+            timeout=timeout_seconds,
+        )
+
+        location = response.headers.get("Location")
+        if (
+            response.status_code not in REDIRECT_STATUS_CODES
+            or location is None
+        ):
+            return response
+
+        if redirect_count >= MAX_REDIRECTS:
+            raise httpx.TooManyRedirects(
+                f"The target exceeded the limit of {MAX_REDIRECTS} redirects",
+                request=response.request,
+            )
+
+        current_url = urljoin(str(response.url), location)
+
+    raise RuntimeError("Redirect handling exhausted unexpectedly")
 
 
 async def check_monitor(monitor: Monitor) -> CheckResult:
     start_time = time.perf_counter()
 
     try:
-        # Many healthy sites redirect from a bare domain to their canonical
-        # URL or from a protected page to a login page. Judge the final HTTP
-        # response instead of incorrectly treating that redirect as downtime.
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(
+        async with httpx.AsyncClient(
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
+            response = await _get_with_validated_redirects(
+                client,
                 monitor.url,
-                timeout=monitor.timeout_seconds,
+                monitor.timeout_seconds,
             )
-        latency_ms = (time.perf_counter() - start_time) * 1000
-        success = response.status_code == monitor.expected_status_code
 
+        success = response.status_code == monitor.expected_status_code
         error = None
         if not success:
             error = (
@@ -26,40 +89,42 @@ async def check_monitor(monitor: Monitor) -> CheckResult:
                 f"got {response.status_code} {response.reason_phrase}"
             ).strip()
 
-        return CheckResult(
+        return _result(
+            start_time,
             status_code=response.status_code,
-            latency_ms=latency_ms,
             success=success,
             error=error,
-            checked_at=datetime.now(timezone.utc),
+        )
+
+    except MonitorUrlRejectedError as error:
+        return _result(
+            start_time,
+            status_code=None,
+            success=False,
+            error=str(error),
+            security_rejected=True,
         )
 
     except httpx.TimeoutException as error:
-        latency_ms = (time.perf_counter() - start_time) * 1000
-        return CheckResult(
+        return _result(
+            start_time,
             status_code=None,
-            latency_ms=latency_ms,
             success=False,
             error=str(error) or "The request timed out",
-            checked_at=datetime.now(timezone.utc),
         )
 
     except httpx.ConnectError as error:
-        latency_ms = (time.perf_counter() - start_time) * 1000
-        return CheckResult(
+        return _result(
+            start_time,
             status_code=None,
-            latency_ms=latency_ms,
             success=False,
             error=str(error) or "Could not connect to the server",
-            checked_at=datetime.now(timezone.utc),
         )
 
     except httpx.RequestError as error:
-        latency_ms = (time.perf_counter() - start_time) * 1000
-        return CheckResult(
+        return _result(
+            start_time,
             status_code=None,
-            latency_ms=latency_ms,
             success=False,
             error=str(error) or "Request failed",
-            checked_at=datetime.now(timezone.utc),
         )

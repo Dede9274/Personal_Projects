@@ -19,6 +19,7 @@ def check_result(
     success: bool,
     checked_at: datetime,
     error: str | None = None,
+    security_rejected: bool = False,
 ) -> CheckResult:
     return CheckResult(
         status_code=200 if success else None,
@@ -26,6 +27,7 @@ def check_result(
         success=success,
         error=error,
         checked_at=checked_at,
+        security_rejected=security_rejected,
     )
 
 
@@ -44,6 +46,30 @@ def incident(incident_id: int, failure_count: int = 3) -> IncidentDB:
 
 
 class IncidentServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_security_rejection_does_not_change_incident_state(self):
+        result = check_result(
+            success=False,
+            checked_at=datetime.now(timezone.utc),
+            error="Monitor URL rejected: The target is not public.",
+            security_rejected=True,
+        )
+
+        with (
+            patch(
+                "app.services.incident_service.get_active_incident",
+                AsyncMock(),
+            ) as active_incident_mock,
+            patch(
+                "app.services.incident_service.get_check_results",
+                AsyncMock(),
+            ) as history_mock,
+        ):
+            processed_incident = await process_check_result(7, result)
+
+        self.assertIsNone(processed_incident)
+        active_incident_mock.assert_not_awaited()
+        history_mock.assert_not_awaited()
+
     async def test_success_without_open_incident_does_nothing(self):
         result = check_result(
             success=True,
@@ -253,6 +279,50 @@ class IncidentServiceTests(unittest.IsolatedAsyncioTestCase):
             ) as create_mock,
         ):
             processed_incident = await process_check_result(7, results[0])
+
+        self.assertIsNone(processed_incident)
+        create_mock.assert_not_awaited()
+
+    async def test_security_rejection_resets_failure_streak(self):
+        first_at = datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc)
+        latest_failure = check_result(
+            success=False,
+            checked_at=first_at + timedelta(seconds=4),
+            error="Failure two",
+        )
+        results = [
+            latest_failure,
+            check_result(
+                success=False,
+                checked_at=first_at + timedelta(seconds=2),
+                error="Monitor URL rejected",
+                security_rejected=True,
+            ),
+            check_result(
+                success=False,
+                checked_at=first_at,
+                error="Failure one",
+            ),
+        ]
+
+        with (
+            patch(
+                "app.services.incident_service.get_active_incident",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.services.incident_service.get_check_results",
+                AsyncMock(return_value=results),
+            ),
+            patch(
+                "app.services.incident_service.create_incident",
+                AsyncMock(),
+            ) as create_mock,
+        ):
+            processed_incident = await process_check_result(
+                7,
+                latest_failure,
+            )
 
         self.assertIsNone(processed_incident)
         create_mock.assert_not_awaited()

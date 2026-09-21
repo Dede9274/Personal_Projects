@@ -8,11 +8,12 @@ import {
   Tooltip,
 } from "recharts";
 
-type MonitorStatus = "UP" | "DOWN" | "PAUSED" | "PENDING";
+type MonitorStatus = "UP" | "DOWN" | "BLOCKED" | "PAUSED" | "PENDING";
 
 type MonitorStatusChartProps = {
   up: number;
   down: number;
+  blocked: number;
   paused: number;
   pending: number;
 };
@@ -20,6 +21,7 @@ type MonitorStatusChartProps = {
 const COLORS: Record<MonitorStatus, string> = {
   UP: "#16a34a",
   DOWN: "#dc2626",
+  BLOCKED: "#7c3aed",
   PAUSED: "#d97706",
   PENDING: "#94a3b8",
 };
@@ -27,6 +29,7 @@ const COLORS: Record<MonitorStatus, string> = {
 const STATUS_LABELS: Record<MonitorStatus, string> = {
   UP: "Up",
   DOWN: "Down",
+  BLOCKED: "Blocked",
   PAUSED: "Paused",
   PENDING: "Pending",
 };
@@ -34,16 +37,18 @@ const STATUS_LABELS: Record<MonitorStatus, string> = {
 export default function MonitorStatusChart({
   up,
   down,
+  blocked,
   paused,
   pending,
 }: MonitorStatusChartProps) {
   const data: Array<{ name: MonitorStatus; value: number }> = [
     { name: "UP", value: up },
     { name: "DOWN", value: down },
+    { name: "BLOCKED", value: blocked },
     { name: "PAUSED", value: paused },
     { name: "PENDING", value: pending },
   ];
-  const total = up + down + paused + pending;
+  const total = up + down + blocked + paused + pending;
   const percentage = (value: number) =>
     total === 0 ? 0 : Math.round((value / total) * 100);
 
@@ -55,7 +60,7 @@ export default function MonitorStatusChart({
         <div
           className="h-48 w-48 shrink-0"
           role="img"
-          aria-label={`${up} monitors up, ${down} down, ${paused} paused, and ${pending} pending`}
+          aria-label={`${up} monitors up, ${down} down, ${blocked} blocked, ${paused} paused, and ${pending} pending`}
         >
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>

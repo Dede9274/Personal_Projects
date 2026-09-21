@@ -27,6 +27,11 @@ const healthStyles: Record<
     badge: "bg-red-100 text-red-700",
     dot: "bg-red-500",
   },
+  blocked: {
+    label: "Blocked",
+    badge: "bg-violet-100 text-violet-700",
+    dot: "bg-violet-500",
+  },
   paused: {
     label: "Paused",
     badge: "bg-amber-100 text-amber-700",
@@ -178,7 +183,7 @@ export default function MonitorTable({ rows }: MonitorTableProps) {
                     </span>
                   </td>
                   <td className="break-words px-2 py-3 sm:px-3">
-                    {latestCheck === null
+                    {latestCheck === null || latestCheck.security_rejected
                       ? "—"
                       : formatLatency(latestCheck.latency_ms)}
                   </td>

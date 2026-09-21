@@ -9,6 +9,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from app.database.connection import get_session
 from app.database.models import CheckResultDB, MonitorDB
 from app.routers.monitors import router
+from app.security.url_validator import MonitorUrlRejectedError
 
 
 def make_monitor(monitor_id: int = 1) -> MonitorDB:
@@ -39,6 +40,7 @@ def make_check_result(
         latency_ms=25.5,
         success=True,
         error=None,
+        security_rejected=False,
     )
 
 
@@ -81,6 +83,28 @@ class MonitorRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["id"], 1)
         create_mock.assert_awaited_once()
+
+    async def test_create_monitor_reports_a_rejected_target(self):
+        with patch(
+            "app.routers.monitors.monitor_service.create_monitor",
+            AsyncMock(
+                side_effect=MonitorUrlRejectedError(
+                    "The target resolves to a non-public address."
+                )
+            ),
+        ):
+            response = await self.client.post(
+                "/monitors",
+                json={
+                    "name": "Private service",
+                    "url": "https://example.com",
+                    "interval_seconds": 30,
+                    "timeout_seconds": 5,
+                },
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("Monitor URL rejected", response.json()["detail"])
 
     async def test_list_monitors_returns_a_list(self):
         with patch(
@@ -139,6 +163,7 @@ class MonitorRouterTests(unittest.IsolatedAsyncioTestCase):
                 "latency_ms": 25.5,
                 "success": True,
                 "error": None,
+                "security_rejected": False,
             },
         )
         list_mock.assert_awaited_once_with(self.session, 1, 25)
@@ -305,6 +330,23 @@ class MonitorRouterTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(response.status_code, 404)
+
+    async def test_update_monitor_reports_a_rejected_target(self):
+        with patch(
+            "app.routers.monitors.monitor_service.update_monitor",
+            AsyncMock(
+                side_effect=MonitorUrlRejectedError(
+                    "The target resolves to a non-public address."
+                )
+            ),
+        ):
+            response = await self.client.patch(
+                "/monitors/1",
+                json={"url": "https://example.com"},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("Monitor URL rejected", response.json()["detail"])
 
     async def test_delete_monitor_returns_204_without_a_body(self):
         with patch(

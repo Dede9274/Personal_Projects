@@ -121,8 +121,11 @@ export default function MonitorCheckDashboard({
 
   const metrics = useMemo(() => {
     const latestCheck = checks[0] ?? null;
+    const availabilityChecks = checks.filter(
+      (check) => !check.security_rejected,
+    );
 
-    if (checks.length === 0) {
+    if (availabilityChecks.length === 0) {
       return {
         latestCheck,
         averageLatency: null,
@@ -130,16 +133,18 @@ export default function MonitorCheckDashboard({
       };
     }
 
-    const totalLatency = checks.reduce(
+    const totalLatency = availabilityChecks.reduce(
       (total, check) => total + check.latency_ms,
       0,
     );
-    const successfulChecks = checks.filter((check) => check.success).length;
+    const successfulChecks = availabilityChecks.filter(
+      (check) => check.success,
+    ).length;
 
     return {
       latestCheck,
-      averageLatency: totalLatency / checks.length,
-      successRate: (successfulChecks / checks.length) * 100,
+      averageLatency: totalLatency / availabilityChecks.length,
+      successRate: (successfulChecks / availabilityChecks.length) * 100,
     };
   }, [checks]);
 
@@ -147,6 +152,8 @@ export default function MonitorCheckDashboard({
     ? "Paused"
     : metrics.latestCheck === null
       ? "Awaiting check"
+      : metrics.latestCheck.security_rejected
+        ? "Blocked"
       : metrics.latestCheck.success
         ? "Up"
         : "Down";
@@ -154,6 +161,8 @@ export default function MonitorCheckDashboard({
     ? "bg-amber-100 text-amber-600"
     : metrics.latestCheck === null
       ? "bg-slate-100 text-slate-500"
+      : metrics.latestCheck.security_rejected
+        ? "bg-violet-100 text-violet-700"
       : metrics.latestCheck.success
         ? "bg-emerald-100 text-emerald-600"
         : "bg-red-100 text-red-600";
@@ -175,6 +184,9 @@ export default function MonitorCheckDashboard({
       ? "Checks are delayed. The scheduler or monitor worker may not be running."
       : metrics.latestCheck === null
         ? "Waiting for the first completed check from the scheduler and monitor worker."
+        : metrics.latestCheck.security_rejected
+          ? metrics.latestCheck.error ??
+            "The latest check was blocked by the outbound request security policy."
         : `Monitoring is active. Latest check: ${new Date(
             metrics.latestCheck.checked_at,
           ).toISOString()}.`;
@@ -197,10 +209,16 @@ export default function MonitorCheckDashboard({
       )}
 
       <div
-        role={checksAreDelayed ? "alert" : "status"}
+        role={
+          checksAreDelayed || metrics.latestCheck?.security_rejected
+            ? "alert"
+            : "status"
+        }
         className={`mt-6 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${
           checksAreDelayed
             ? "border-amber-200 bg-amber-50 text-amber-800"
+            : metrics.latestCheck?.security_rejected
+              ? "border-violet-200 bg-violet-50 text-violet-800"
             : monitor.is_active
               ? "border-emerald-200 bg-emerald-50 text-emerald-800"
               : "border-slate-200 bg-slate-50 text-slate-600"
@@ -211,6 +229,8 @@ export default function MonitorCheckDashboard({
           className={`size-2.5 shrink-0 rounded-full ${
             checksAreDelayed
               ? "bg-amber-500"
+              : metrics.latestCheck?.security_rejected
+                ? "bg-violet-500"
               : monitor.is_active
                 ? "bg-emerald-500"
                 : "bg-slate-400"
@@ -233,7 +253,13 @@ export default function MonitorCheckDashboard({
             aria-hidden="true"
             className={`flex size-14 shrink-0 items-center justify-center rounded-xl text-2xl font-bold ${statusTone}`}
           >
-            {currentState === "Up" ? "✓" : currentState === "Down" ? "×" : "◷"}
+            {currentState === "Up"
+              ? "✓"
+              : currentState === "Down"
+                ? "×"
+                : currentState === "Blocked"
+                  ? "!"
+                  : "◷"}
           </span>
           <div>
             <p className="text-[15px] font-semibold text-slate-500">Current Status</p>
@@ -241,6 +267,8 @@ export default function MonitorCheckDashboard({
             <p className="text-xs text-slate-500">
               {metrics.latestCheck === null
                 ? "No completed checks"
+                : metrics.latestCheck.security_rejected
+                  ? "Request not sent"
                 : `HTTP ${metrics.latestCheck.status_code ?? "unavailable"}`}
             </p>
           </div>

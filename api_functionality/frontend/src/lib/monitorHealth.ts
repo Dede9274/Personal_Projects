@@ -3,6 +3,7 @@ import type { CheckResult, Monitor } from "@/lib/api/types";
 export type MonitorHealth =
   | "up"
   | "down"
+  | "blocked"
   | "paused"
   | "awaiting"
   | "delayed"
@@ -27,5 +28,6 @@ export function getMonitorHealth(
   );
 
   if (now - checkedAt > expectedCheckWindowMs) return "delayed";
+  if (latestCheck.security_rejected) return "blocked";
   return latestCheck.success ? "up" : "down";
 }

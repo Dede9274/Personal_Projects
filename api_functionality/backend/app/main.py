@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database.connection import engine
 from app.routers.incidents import router as incidents_router
 from app.routers.monitors import router as monitors_router
+from app.routers.notifications import router as notifications_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -41,3 +42,4 @@ app.add_middleware(
 
 app.include_router(monitors_router)
 app.include_router(incidents_router)
+app.include_router(notifications_router)
