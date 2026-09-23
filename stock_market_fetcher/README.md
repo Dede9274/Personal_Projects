@@ -1,8 +1,51 @@
 # PulseStock
 
-PulseStock serves a small modular frontend and a Flask API from the same local
-server. Finnhub and Groq credentials are read only by Flask; they are never
-included in browser code or browser requests.
+PulseStock is a full-stack stock-news dashboard that collects recent company
+headlines and uses an LLM to classify their likely market sentiment. Users can
+select or add ticker symbols, fetch current news, and explore bullish, bearish,
+or neutral stories with a short explanation for each classification.
+
+The application combines live news from Finnhub with structured sentiment
+analysis from Groq. It presents article totals and sentiment statistics, supports
+interactive filtering, and links each result back to its original source.
+
+## Features
+
+- Fetches the latest seven days of company news for multiple ticker symbols.
+- Classifies headlines as `bullish`, `bearish`, or `neutral` using Groq.
+- Generates a concise explanation for every sentiment classification.
+- Displays aggregate sentiment statistics and interactive result filters.
+- Validates ticker symbols and incoming analysis requests on the backend.
+- Handles invalid credentials, rate limits, timeouts, and upstream failures with
+  actionable error messages.
+- Keeps Finnhub and Groq credentials exclusively on the server.
+- Includes mocked backend integration tests and dependency-free frontend tests.
+
+## How it works
+
+```text
+Browser
+   │
+   ├── GET /api/news/<ticker> ──────── Flask ──────── Finnhub
+   │
+   └── POST /api/analyse-news ─────── Flask ──────── Groq
+                                      │
+                                      └── Validated sentiment JSON
+```
+
+Flask serves the modular frontend and both API endpoints from the same origin.
+The browser never receives either third-party API key. Groq is constrained with
+a strict JSON schema, and the backend validates its output before returning
+enriched articles to the dashboard.
+
+## Technology
+
+- Python, Flask, and Requests
+- Vanilla JavaScript ES modules
+- HTML and CSS
+- Finnhub company-news API
+- Groq Chat Completions API with `openai/gpt-oss-20b`
+- pytest and the Node.js test runner
 
 ## Run locally
 
