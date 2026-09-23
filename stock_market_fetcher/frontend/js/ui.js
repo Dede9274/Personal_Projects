@@ -1,6 +1,6 @@
 const byId = id => document.getElementById(id);
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -9,7 +9,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function safeUrl(value) {
+export function safeUrl(value) {
   try {
     const url = new URL(value);
     return ['http:', 'https:'].includes(url.protocol) ? escapeHtml(url.href) : '';

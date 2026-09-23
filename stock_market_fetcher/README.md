@@ -19,6 +19,20 @@ Open <http://localhost:5050>.
 
 `ANTHROPIC_MODEL` can optionally override the default model.
 
+## Tests
+
+Install the Python development dependency and run both suites:
+
+```bash
+pip install -r requirements-dev.txt
+python3 -m pytest tests
+npm test
+```
+
+The backend suite mocks Finnhub and Anthropic, so tests never call external APIs
+or require real credentials. The frontend suite uses Node's built-in test runner
+and has no npm dependencies.
+
 ## API
 
 - `GET /api/health` reports whether both integrations are configured.
@@ -38,4 +52,6 @@ frontend/
     ├── app.js
     ├── state.js
     └── ui.js
+tests/
+└── test_api.py
 ```
