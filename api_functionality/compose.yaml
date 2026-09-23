@@ -7,20 +7,14 @@ x-backend-service: &backend-service
     DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-uptime_user}:${POSTGRES_PASSWORD:-uptime_password}@postgres:5432/${POSTGRES_DB:-uptime_monitor}
     REDIS_URL: redis://redis:6379/0
     FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
-    EMAIL_NOTIFICATIONS_ENABLED: ${EMAIL_NOTIFICATIONS_ENABLED:-false}
-    SMTP_HOST: ${SMTP_HOST:-smtp.example.com}
+    SMTP_HOST: ${SMTP_HOST:-}
     SMTP_PORT: ${SMTP_PORT:-587}
     SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
     SMTP_USERNAME: ${SMTP_USERNAME:-}
     SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-    SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-uptime@example.com}
-    ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-owner@example.com}
-    SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
-    WEBHOOK_NOTIFICATIONS_ENABLED: ${WEBHOOK_NOTIFICATIONS_ENABLED:-false}
-    ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://example.com/webhooks/uptime}
+    SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
     WEBHOOK_BEARER_TOKEN: ${WEBHOOK_BEARER_TOKEN:-}
     WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
-    WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
   restart: unless-stopped
 
 services:

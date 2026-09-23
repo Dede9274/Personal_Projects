@@ -16,6 +16,7 @@ class CheckResultSchemaTests(unittest.TestCase):
             latency_ms=5000.25,
             success=False,
             error="The request timed out",
+            security_rejected=False,
         )
 
         response = CheckResultResponse.model_validate(result_db)
@@ -26,6 +27,7 @@ class CheckResultSchemaTests(unittest.TestCase):
         self.assertIsNone(response.status_code)
         self.assertEqual(response.latency_ms, 5000.25)
         self.assertFalse(response.success)
+        self.assertFalse(response.security_rejected)
         self.assertEqual(response.error, "The request timed out")
 
 

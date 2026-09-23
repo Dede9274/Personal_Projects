@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 if os.getenv("RUN_DATABASE_TESTS") != "1":
@@ -8,24 +9,47 @@ if os.getenv("RUN_DATABASE_TESTS") != "1":
         "postgresql+psycopg://test:test@localhost:5432/test",
     )
 
-from app.models.notification import NotificationChannel
+from app.models.notification import (
+    NotificationChannel,
+    NotificationPreferences,
+)
 from app.services.notification_service import (
     enqueue_incident_opened_notifications,
 )
 
 
 class NotificationServiceTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def preferences(
+        *,
+        email_enabled: bool,
+        webhook_enabled: bool,
+        notify_incident_opened: bool = True,
+    ) -> NotificationPreferences:
+        return NotificationPreferences(
+            email_enabled=email_enabled,
+            email_recipients=("alerts@example.test",),
+            email_timeout_seconds=10,
+            webhook_enabled=webhook_enabled,
+            webhook_url="https://hooks.example.test/uptime",
+            webhook_timeout_seconds=10,
+            notify_incident_opened=notify_incident_opened,
+            updated_at=datetime.now(timezone.utc),
+        )
+
     async def test_enqueues_each_enabled_channel_independently(self):
         enqueue_mock = AsyncMock(side_effect=["1-0", "2-0"])
 
         with (
             patch(
                 "app.services.notification_service."
-                "get_enabled_notification_channels",
-                return_value=[
-                    NotificationChannel.EMAIL,
-                    NotificationChannel.WEBHOOK,
-                ],
+                "get_notification_preferences",
+                AsyncMock(
+                    return_value=self.preferences(
+                        email_enabled=True,
+                        webhook_enabled=True,
+                    )
+                ),
             ),
             patch(
                 "app.services.notification_service."
@@ -51,8 +75,13 @@ class NotificationServiceTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch(
                 "app.services.notification_service."
-                "get_enabled_notification_channels",
-                return_value=[],
+                "get_notification_preferences",
+                AsyncMock(
+                    return_value=self.preferences(
+                        email_enabled=False,
+                        webhook_enabled=False,
+                    )
+                ),
             ),
             patch(
                 "app.services.notification_service."

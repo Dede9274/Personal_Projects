@@ -27,6 +27,9 @@ async def process_check_result(
     check_result: CheckResult,
 ) -> IncidentDB | None:
     """Update incident state after the check result has been persisted."""
+    if check_result.security_rejected:
+        return None
+
     active_incident = await get_active_incident(monitor_id)
 
     if check_result.success:
@@ -55,7 +58,10 @@ async def process_check_result(
     if len(recent_results) < CONSECUTIVE_FAILURES_TO_OPEN:
         return None
 
-    if any(result.success for result in recent_results):
+    if any(
+        result.success or result.security_rejected
+        for result in recent_results
+    ):
         return None
 
     failures = sorted(

@@ -6,8 +6,16 @@ import logging
 import sys
 
 from app.database.connection import engine
-from app.database.repository import get_incident, get_monitor_by_id
+from app.database.repository import (
+    get_incident,
+    get_monitor_by_id,
+    get_notification_preferences,
+)
 from app.models.notification import NotificationChannel
+from app.notifications.config import (
+    get_email_settings,
+    get_webhook_settings,
+)
 from app.notifications.email import send_incident_opened_email
 from app.notifications.webhook import send_incident_opened_webhook
 from app.queue.connection import (
@@ -48,15 +56,44 @@ async def execute_notification_job(
             f"Incident {incident_id} does not belong to monitor {monitor_id}"
         )
 
+    preferences = await get_notification_preferences()
+
+    if not preferences.notify_incident_opened:
+        logger.info(
+            "Skipping %s notification because incident alerts are disabled",
+            channel.value,
+        )
+        return
+
     if channel is NotificationChannel.EMAIL:
+        if not preferences.email_enabled:
+            logger.info(
+                "Skipping email notification because email is disabled"
+            )
+            return
+
         await send_incident_opened_email(
             incident=incident,
             monitor=monitor,
+            settings=get_email_settings(
+                recipients=preferences.email_recipients,
+                timeout_seconds=preferences.email_timeout_seconds,
+            ),
         )
     elif channel is NotificationChannel.WEBHOOK:
+        if not preferences.webhook_enabled:
+            logger.info(
+                "Skipping webhook notification because webhooks are disabled"
+            )
+            return
+
         await send_incident_opened_webhook(
             incident=incident,
             monitor=monitor,
+            settings=get_webhook_settings(
+                url=preferences.webhook_url,
+                timeout_seconds=preferences.webhook_timeout_seconds,
+            ),
         )
     else:
         raise ValueError(f"Unsupported notification channel: {channel}")

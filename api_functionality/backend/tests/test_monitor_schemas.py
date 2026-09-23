@@ -67,6 +67,18 @@ class MonitorSchemaTests(unittest.TestCase):
                 unknown_setting=True,
             )
 
+    def test_create_rejects_embedded_url_credentials(self):
+        with self.assertRaisesRegex(
+            ValidationError,
+            "Embedded usernames and passwords",
+        ):
+            MonitorCreate(
+                name="Credential URL",
+                url="https://admin:password@example.com/health",
+                interval_seconds=30,
+                timeout_seconds=5,
+            )
+
     def test_update_accepts_only_the_supplied_fields(self):
         update = MonitorUpdate(interval_seconds=60)
 

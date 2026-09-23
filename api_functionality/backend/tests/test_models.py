@@ -1,7 +1,12 @@
 import unittest
 
 from app.database.base import Base
-from app.database.models import CheckResultDB, IncidentDB, MonitorDB
+from app.database.models import (
+    CheckResultDB,
+    IncidentDB,
+    MonitorDB,
+    NotificationSettingsDB,
+)
 from app.models.monitor import Monitor
 
 
@@ -20,11 +25,20 @@ class ModelTests(unittest.TestCase):
     def test_orm_tables_are_registered(self):
         self.assertEqual(
             set(Base.metadata.tables),
-            {"monitors", "check_results", "incidents"},
+            {
+                "monitors",
+                "check_results",
+                "incidents",
+                "notification_settings",
+            },
         )
         self.assertEqual(MonitorDB.__tablename__, "monitors")
         self.assertEqual(CheckResultDB.__tablename__, "check_results")
         self.assertEqual(IncidentDB.__tablename__, "incidents")
+        self.assertEqual(
+            NotificationSettingsDB.__tablename__,
+            "notification_settings",
+        )
 
     def test_nullable_result_columns(self):
         table = CheckResultDB.__table__
@@ -32,6 +46,7 @@ class ModelTests(unittest.TestCase):
         self.assertTrue(table.c.status_code.nullable)
         self.assertTrue(table.c.error.nullable)
         self.assertFalse(table.c.latency_ms.nullable)
+        self.assertFalse(table.c.security_rejected.nullable)
 
     def test_monitor_purpose_is_required(self):
         self.assertFalse(MonitorDB.__table__.c.purpose.nullable)

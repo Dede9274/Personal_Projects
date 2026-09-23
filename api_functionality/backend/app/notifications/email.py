@@ -3,6 +3,7 @@
 import asyncio
 import smtplib
 import ssl
+from datetime import datetime, timezone
 from email.message import EmailMessage
 
 from app.database.models import IncidentDB
@@ -32,6 +33,20 @@ def build_incident_email(
         f"Started at: {incident.started_at.isoformat()}\n"
         f"Failure count: {incident.failure_count}\n"
         f"Latest error: {error_message}\n"
+    )
+    return message
+
+
+def build_test_email(*, settings: EmailSettings) -> EmailMessage:
+    """Build a delivery test without incident data."""
+    message = EmailMessage()
+    message["Subject"] = "[TEST] API Checker email notifications"
+    message["From"] = settings.from_email
+    message["To"] = ", ".join(settings.recipients)
+    message.set_content(
+        "API Checker successfully connected to your SMTP server.\n\n"
+        f"Sent at: {datetime.now(timezone.utc).isoformat()}\n"
+        "Incident-opened email notifications can now be delivered.\n"
     )
     return message
 
@@ -79,4 +94,10 @@ async def send_incident_opened_email(
         monitor=monitor,
         settings=settings,
     )
+    await asyncio.to_thread(_send_email_sync, message, settings)
+
+
+async def send_test_email(*, settings: EmailSettings) -> None:
+    """Send a test message through the configured SMTP transport."""
+    message = build_test_email(settings=settings)
     await asyncio.to_thread(_send_email_sync, message, settings)

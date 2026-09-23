@@ -92,7 +92,12 @@ export default async function MonitorsPage({ searchParams }: MonitorsPageProps) 
       const checksLoaded = checkResult?.status === "fulfilled";
       const checks = checksLoaded ? checkResult.value : [];
       const latestCheck = checks[0] ?? null;
-      const successfulChecks = checks.filter((check) => check.success).length;
+      const availabilityChecks = checks.filter(
+        (check) => !check.security_rejected,
+      );
+      const successfulChecks = availabilityChecks.filter(
+        (check) => check.success,
+      ).length;
 
       return {
         monitor,
@@ -100,9 +105,9 @@ export default async function MonitorsPage({ searchParams }: MonitorsPageProps) 
         checksLoaded,
         health: getMonitorHealth(monitor, latestCheck, checksLoaded, now),
         recentUptime:
-          checks.length === 0
+          availabilityChecks.length === 0
             ? null
-            : (successfulChecks / checks.length) * 100,
+            : (successfulChecks / availabilityChecks.length) * 100,
       };
     },
   );

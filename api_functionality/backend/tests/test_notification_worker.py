@@ -11,7 +11,10 @@ if os.getenv("RUN_DATABASE_TESTS") != "1":
 
 from app.database.models import IncidentDB
 from app.models.monitor import Monitor
-from app.models.notification import NotificationChannel
+from app.models.notification import (
+    NotificationChannel,
+    NotificationPreferences,
+)
 from app.workers.notification_worker import execute_notification_job
 
 
@@ -39,6 +42,19 @@ def make_monitor() -> Monitor:
     )
 
 
+def make_preferences() -> NotificationPreferences:
+    return NotificationPreferences(
+        email_enabled=True,
+        email_recipients=("alerts@example.test",),
+        email_timeout_seconds=10,
+        webhook_enabled=True,
+        webhook_url="https://hooks.example.test/uptime",
+        webhook_timeout_seconds=10,
+        notify_incident_opened=True,
+        updated_at=datetime.now(timezone.utc),
+    )
+
+
 class NotificationWorkerTests(unittest.IsolatedAsyncioTestCase):
     async def test_email_job_uses_only_email_sender(self):
         with (
@@ -49,6 +65,15 @@ class NotificationWorkerTests(unittest.IsolatedAsyncioTestCase):
             patch(
                 "app.workers.notification_worker.get_monitor_by_id",
                 AsyncMock(return_value=make_monitor()),
+            ),
+            patch(
+                "app.workers.notification_worker."
+                "get_notification_preferences",
+                AsyncMock(return_value=make_preferences()),
+            ),
+            patch(
+                "app.workers.notification_worker.get_email_settings",
+                return_value=object(),
             ),
             patch(
                 "app.workers.notification_worker."
@@ -79,6 +104,15 @@ class NotificationWorkerTests(unittest.IsolatedAsyncioTestCase):
             patch(
                 "app.workers.notification_worker.get_monitor_by_id",
                 AsyncMock(return_value=make_monitor()),
+            ),
+            patch(
+                "app.workers.notification_worker."
+                "get_notification_preferences",
+                AsyncMock(return_value=make_preferences()),
+            ),
+            patch(
+                "app.workers.notification_worker.get_webhook_settings",
+                return_value=object(),
             ),
             patch(
                 "app.workers.notification_worker."

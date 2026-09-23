@@ -9,11 +9,13 @@ API Checker separates its REST API, scheduler, check execution, and notification
 ## At a glance
 
 - Create, edit, pause, delete, and manually check HTTP monitors.
+- Block SSRF targets at creation and execution time, including every redirect.
 - Configure the interval, timeout, and expected HTTP status per endpoint.
 - Track latency, success rate, uptime history, and recent check results.
 - Open an incident after three consecutive failures and resolve it on recovery.
 - Move incidents through `OPEN`, `INVESTIGATING`, and `RESOLVED` states.
-- Deliver incident-opened alerts over SMTP and signed JSON webhooks.
+- Persist notification preferences and deliver alerts over SMTP or optionally signed webhooks.
+- Verify SMTP from the dashboard with a real test email before relying on alerts.
 - Distribute checks across multiple Redis consumer-group workers.
 - Recover abandoned work, retry transient failures, and dead-letter exhausted jobs.
 - Start the complete eight-service stack with Docker Compose.
@@ -36,21 +38,25 @@ The screenshots use representative local data; the interface itself is the appli
 flowchart LR
     Browser[Browser] -->|Next.js pages and actions| Frontend[Next.js frontend]
     Frontend -->|REST / JSON| API[FastAPI API]
-    API -->|monitor and incident CRUD| Postgres[(PostgreSQL)]
+    API -->|incidents and notification settings| Postgres[(PostgreSQL)]
+    API -->|monitor create or URL update| Guard[SSRF target policy]
+    Guard -->|approved monitor configuration| Postgres
     API -->|manual check job| Redis[(Redis Streams)]
 
     Scheduler[Scheduler] -->|load active monitors| Postgres
     Scheduler -->|deduplicated check jobs| Redis
 
     Redis -->|monitor-workers group| CheckWorker[Monitor worker]
-    CheckWorker -->|HTTP request| Target[Monitored endpoint]
+    CheckWorker -->|validate current URL and each redirect| Guard
+    Guard -->|public HTTP/S request only| Target[Monitored endpoint]
     CheckWorker -->|check result and incident state| Postgres
     CheckWorker -->|incident-opened jobs| Redis
 
     Redis -->|notification-workers group| NotifyWorker[Notification worker]
-    NotifyWorker -->|load current data| Postgres
+    NotifyWorker -->|load incident, monitor, and preferences| Postgres
+    Secrets[Environment-only delivery secrets] --> NotifyWorker
     NotifyWorker --> Email[SMTP]
-    NotifyWorker --> Webhook[Webhook]
+    NotifyWorker --> Webhook[Webhook with optional HMAC]
 ```
 
 There are two distinct paths through the system:
@@ -70,7 +76,7 @@ PostgreSQL is always the source of truth. Redis holds temporary delivery state a
 | API | FastAPI, Pydantic 2 | Async endpoints, strict validation, generated OpenAPI documentation |
 | Data access | SQLAlchemy 2 async, Psycopg 3 | Explicit async persistence with PostgreSQL-native behavior |
 | Migrations | Alembic | Versioned, repeatable schema changes |
-| HTTP checks | HTTPX | Async requests, redirects, timeouts, and clear network exceptions |
+| HTTP checks | HTTPX | Async requests, manually validated redirects, timeouts, and clear network exceptions |
 | Job delivery | Redis 8 Streams | Consumer groups, pending-entry recovery, and lightweight horizontal scaling |
 | Database | PostgreSQL 18 | Durable relational state, constraints, indexes, and transactional writes |
 | Runtime | Python 3.11, Node.js 24 | Reproducible slim container images for the backend and frontend |
@@ -139,10 +145,16 @@ Important settings:
 | `POSTGRES_PORT` | `5433` | Host port mapped to PostgreSQL |
 | `REDIS_PORT` | `6379` | Host port mapped to Redis on `127.0.0.1` |
 | `FRONTEND_ORIGINS` | localhost origins | Origins permitted by FastAPI CORS |
-| `EMAIL_NOTIFICATIONS_ENABLED` | `false` | Enable incident email jobs |
-| `WEBHOOK_NOTIFICATIONS_ENABLED` | `false` | Enable incident webhook jobs |
+| `SMTP_HOST` | unset | SMTP server used for email delivery |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_SECURITY` | `starttls` | `starttls`, `ssl`, or `none` |
+| `SMTP_USERNAME` | unset | Optional SMTP account username |
+| `SMTP_PASSWORD` | unset | SMTP password or provider app password |
+| `SMTP_FROM_EMAIL` | unset | Sender shown on notification emails |
+| `WEBHOOK_BEARER_TOKEN` | unset | Optional server-side webhook bearer credential |
+| `WEBHOOK_SIGNING_SECRET` | unset | Optional secret for `X-Uptime-Signature` HMAC-SHA256 |
 
-SMTP supports `starttls`, `ssl`, and `none`. Webhooks can include a bearer token and an `X-Uptime-Signature` HMAC-SHA256 signature. See [notification configuration](backend/docs/notifications.md) for every setting and the webhook payload.
+Channel toggles, recipients, webhook URL, and delivery timeouts are saved from the **Notifications** page in PostgreSQL. SMTP credentials stay only in `.env` and are never returned to the browser. After configuring SMTP, recreate the backend services, save an email recipient in the dashboard, and use **Send test email** to verify delivery. Webhooks can include a bearer token and an `X-Uptime-Signature` HMAC-SHA256 signature. See [notification configuration](backend/docs/notifications.md) for the complete setup.
 
 ## Services
 
@@ -247,6 +259,12 @@ FastAPI is deliberately thin: routers validate HTTP input and delegate persisten
 
 Manual checks return `202 Accepted` with a Redis job ID. If a job for the monitor is already queued or running, the endpoint returns `200 OK` with `already_outstanding`; inactive monitors return `409 Conflict`.
 
+Monitor URLs must use `http://` or `https://`, cannot contain embedded
+credentials, and must resolve only to public Internet addresses. Creation and
+URL updates perform this check before persistence. The worker repeats it
+immediately before every request because DNS records can change after a monitor
+is saved.
+
 ### Incident endpoints
 
 | Method | Path | Behavior |
@@ -256,6 +274,14 @@ Manual checks return `202 Accepted` with a Redis job ID. If a job for the monito
 | `GET` | `/incidents/{id}` | Read one incident |
 | `PATCH` | `/incidents/{id}` | Apply a valid manual status transition |
 | `GET` | `/monitors/{id}/incidents` | List incident history for a monitor |
+
+### Notification endpoints
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `GET` | `/notification-settings` | Read persisted channel preferences and safe SMTP readiness details |
+| `PATCH` | `/notification-settings` | Save recipients, channel toggles, URLs, events, and timeouts |
+| `POST` | `/notification-settings/test-email` | Send a test message to the saved recipients |
 
 Example monitor:
 
@@ -273,6 +299,35 @@ curl -X POST http://localhost:8000/monitors \
   }'
 ```
 
+## Outbound request security
+
+Monitor URLs cross a server-side trust boundary: the worker can reach networks
+that a browser user cannot. The shared SSRF policy therefore runs twice—before
+a URL is stored and again immediately before the worker sends each request.
+
+The policy:
+
+1. Accepts only credential-free `http://` and `https://` URLs.
+2. Rejects parser ambiguity such as backslashes, control characters, missing
+   hosts, and invalid ports.
+3. Resolves the hostname with a five-second DNS timeout and requires **every**
+   IPv4 or IPv6 result to be globally reachable unicast.
+4. Rejects private, loopback, link-local, multicast, reserved, and unspecified
+   addresses, including `127.0.0.1`, RFC 1918 networks, `::1`, and the
+   `169.254.169.254` metadata address.
+5. Disables HTTPX automatic redirects, resolves and validates each redirect
+   destination, and stops after five redirects.
+6. Ignores proxy environment variables for monitor requests so a proxy cannot
+   silently change the validated route.
+
+A worker-side policy failure is persisted with `security_rejected=true` and
+shown as **Blocked**. It remains auditable but does not reduce uptime, create or
+increment an incident, resolve an existing incident, or send an outage alert.
+Because DNS validation and the HTTP connection remain separate operations,
+production deployments should still enforce network-level egress rules. See
+[outbound request security](backend/docs/outbound-request-security.md) for the
+implementation boundary and defense-in-depth guidance.
+
 ## Redis workflow
 
 ### Monitor checks
@@ -288,7 +343,13 @@ sequenceDiagram
     S->>R: Atomic dedupe + XADD(monitor_id, attempt=1)
     R-->>W: XREADGROUP assigns one job
     W->>P: Load latest active monitor configuration
+    W->>W: Resolve and validate public target
     W->>T: HTTP GET with configured timeout
+    opt Redirect (maximum 5)
+        T-->>W: 301/302/303/307/308 + Location
+        W->>W: Resolve and validate redirect target
+        W->>T: Follow validated redirect
+    end
     T-->>W: Response or network error
     W->>P: Save CheckResult
     W->>P: Open, update, or resolve incident
@@ -316,6 +377,7 @@ The producer uses a Lua script to atomically check a per-monitor key, append the
 - Unexpected processing errors are retried up to three total attempts.
 - Exhausted or malformed messages move to a capped dead-letter stream.
 - An endpoint returning the wrong status is a valid completed check, not a queue failure.
+- Security-rejected targets are persisted as `Blocked`, but do not count as downtime or alter incident state.
 - Jobs are acknowledged only after persistence and incident processing complete.
 
 This is **at-least-once delivery**. If PostgreSQL commits and a worker crashes before the Redis acknowledgement, another worker can repeat the check. The outstanding key prevents concurrent scheduling, but it cannot make a PostgreSQL commit and Redis acknowledgement one transaction. A database-backed job ID or transactional outbox would be the next step for end-to-end idempotency.
@@ -325,11 +387,66 @@ This is **at-least-once delivery**. If PostgreSQL commits and a worker crashes b
 1. Each failed check is persisted.
 2. Three consecutive failures open one incident for that monitor.
 3. Later failures increment its count and update the latest error.
-4. Enabled email and webhook channels receive separate Redis jobs.
+4. Channels enabled on the Notifications page receive separate Redis jobs.
 5. Per-channel keys prevent duplicate alerts while allowing one channel to retry independently.
 6. The next successful check resolves the active incident automatically.
 
+Security-rejected checks break a failure streak without changing an existing
+incident because they describe a prohibited configuration, not target downtime.
+
 For deeper queue semantics and operational commands, see [Redis worker architecture](backend/docs/redis-workers.md).
+
+## Notification system
+
+Notification delivery is a separate asynchronous workflow, so a slow or
+unavailable SMTP/webhook provider cannot block monitor checks or incident
+persistence.
+
+```mermaid
+sequenceDiagram
+    participant M as Monitor worker
+    participant P as PostgreSQL
+    participant R as Redis notifications stream
+    participant N as Notification worker
+    participant D as SMTP / webhook destination
+
+    M->>P: Open incident after 3 failures
+    M->>P: Read enabled notification channels
+    M->>R: XADD one job per enabled channel
+    R-->>N: XREADGROUP assigns job
+    N->>P: Load current incident, monitor, and preferences
+    N->>D: Deliver email or JSON webhook
+    alt Delivery accepted
+        N->>R: Mark channel sent and acknowledge
+    else Temporary or permanent failure
+        N->>R: Retry up to 3 attempts, then dead-letter
+    end
+```
+
+| Stored in PostgreSQL from the dashboard | Kept only in server environment variables |
+| --- | --- |
+| Email/webhook enabled state | SMTP username and password/app password |
+| Email recipients | Webhook bearer token |
+| Webhook destination URL | Webhook HMAC signing secret |
+| Per-channel delivery timeouts | — |
+| Incident-opened event toggle | — |
+
+Each incident/channel pair has an independent Redis delivery lock. An email
+failure therefore does not prevent a webhook from succeeding, and a successful
+channel is not resent when another channel retries. Exhausted jobs move to
+`uptime:notifications:dead` for inspection.
+
+To enable real email delivery:
+
+1. Add the private `SMTP_*` transport values to `.env`.
+2. Recreate `api`, `monitor-worker`, and `notification-worker`.
+3. Open <http://localhost:3000/notifications>, add recipients, enable email,
+   and save.
+4. Select **Send test email**. The endpoint uses the saved recipients and never
+   returns the SMTP password to the browser.
+
+See [notification configuration](backend/docs/notifications.md) for SMTP
+security modes, webhook signing, retry behavior, and troubleshooting.
 
 ## Continuous integration
 
@@ -337,11 +454,24 @@ GitHub Actions runs on every push and pull request that changes `api_functionali
 
 ```text
 changed push / pull request
-├── Backend tests · Python 3.11 · unittest
-└── Frontend quality · Node 24 · ESLint → TypeScript → production build
+├── Backend unit · Python 3.11
+│   ├── SSRF policy, DNS/IP classes, redirects, and API rejection
+│   ├── Notification settings, SMTP/webhook channels, retries, and dead letters
+│   ├── Alembic single-head/offline migration validation
+│   └── Complete unittest discovery
+├── Backend integration · PostgreSQL 18 + Redis 8.2
+│   └── Live migrations, persistence, incident lifecycle, and stream consumers
+├── Docker Compose · complete eight-service topology validation
+└── Frontend · Node 24 · ESLint → TypeScript → production build
 ```
 
-The jobs run independently for fast feedback, cache dependencies from the committed lockfiles, use read-only repository permissions, and cancel superseded runs on the same branch. Database and Redis integration tests remain opt-in because the default suite uses mocks and does not require service containers.
+The jobs run independently for fast feedback, cache dependencies from the
+committed lockfiles, use read-only repository permissions, enforce job
+timeouts, and cancel superseded runs on the same branch. The unit job names the
+SSRF and notification contracts explicitly; the integration job starts clean
+PostgreSQL and Redis service containers and applies every migration before
+testing. External SMTP and webhook delivery remain mocked in CI so repository
+secrets are never required and no real messages are sent.
 
 Workflow: [`.github/workflows/api-functionality-ci.yml`](../.github/workflows/api-functionality-ci.yml)
 
@@ -366,7 +496,35 @@ cd backend
 python -m unittest discover -s tests -v
 ```
 
-Database and Redis integration suites are skipped unless explicitly enabled. To run the complete suite against the Compose infrastructure:
+Run only the SSRF contract tests:
+
+```bash
+python -m unittest \
+  tests.test_url_validator \
+  tests.test_checker \
+  tests.test_monitor_service \
+  tests.test_monitor_router \
+  -v
+```
+
+Run only the notification contract tests:
+
+```bash
+python -m unittest \
+  tests.test_notification_channels \
+  tests.test_notification_config \
+  tests.test_notification_producer \
+  tests.test_notification_queue_worker \
+  tests.test_notification_router \
+  tests.test_notification_schemas \
+  tests.test_notification_service \
+  tests.test_notification_worker \
+  -v
+```
+
+Database and Redis integration suites are skipped locally unless explicitly
+enabled; CI runs them in a dedicated service-container job. To run the complete
+suite against the Compose infrastructure:
 
 ```bash
 docker compose up -d postgres redis migrate
@@ -393,6 +551,7 @@ docker compose config --quiet
 | Redis Streams over an in-process queue | Consumer groups, pending entries, and stale-job recovery support multiple processes without introducing a larger task framework. |
 | One outstanding job per monitor | Prevents backlog growth when a target responds more slowly than its interval. The cadence skips overlap instead of queueing every missed run. |
 | Load monitor configuration in the worker | Queued jobs use the newest URL, timeout, and active state. Redis messages stay small, at the cost of one database read per job. |
+| Validate outbound targets at write and execution time | API validation gives immediate feedback; worker validation protects against later DNS changes. Automatic redirects are disabled, each destination is resolved and checked, and redirect chains stop after five hops. Rejected checks remain auditable without opening incidents. |
 | Three failures before opening an incident | Suppresses short transient failures. It intentionally delays alerting by up to three check intervals. |
 | Resolve on the first successful recovery check | Recovery is reflected quickly and the invariant of one active incident per monitor stays simple. |
 | Database constraints enforce invariants | Positive timing values, valid status codes, consistent resolution timestamps, and one active incident per monitor survive application bugs and concurrency. |
@@ -411,6 +570,7 @@ api_functionality/
 │   │   ├── queue/               # Redis producers and stream consumers
 │   │   ├── routers/             # FastAPI monitor and incident routes
 │   │   ├── schemas/             # Pydantic API contracts
+│   │   ├── security/            # outbound URL and resolved-IP policy
 │   │   ├── services/            # checking, scheduling, incidents, notifications
 │   │   └── workers/             # standalone worker entry points
 │   ├── docs/                    # detailed backend design notes
@@ -428,4 +588,11 @@ api_functionality/
 
 ## Current scope
 
-API Checker is designed for trusted self-hosted environments. Authentication, per-user authorization, TLS termination, Redis authentication/TLS, metrics export, and a transactional notification outbox are not implemented yet. Put the application behind an authenticated reverse proxy and keep PostgreSQL and Redis private before exposing it beyond local development.
+API Checker includes application-layer SSRF defenses for monitor checks, but
+network egress rules remain the strongest backstop against DNS rebinding and
+resolver/connect race conditions. Authentication, per-user authorization, TLS
+termination, Redis authentication/TLS, metrics export, and a transactional
+notification outbox are not implemented yet. Put the application behind an
+authenticated reverse proxy, keep PostgreSQL and Redis private, and restrict
+worker egress before exposing it beyond local development. See
+[outbound request security](backend/docs/outbound-request-security.md).

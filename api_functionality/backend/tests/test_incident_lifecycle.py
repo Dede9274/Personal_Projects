@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import select
 
@@ -81,6 +82,15 @@ class LocalHTTPServer:
     "set RUN_DATABASE_TESTS=1 to run PostgreSQL integration tests",
 )
 class IncidentLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        # The lifecycle test owns this local server. SSRF policy behavior is
+        # exercised separately by test_url_validator and test_checker.
+        self.url_validator_patch = patch(
+            "app.services.checker.validate_monitor_url",
+            AsyncMock(),
+        )
+        self.url_validator_patch.start()
+
     async def test_complete_incident_lifecycle_with_local_server(self):
         server = LocalHTTPServer()
         monitor_id: int | None = None
@@ -243,6 +253,7 @@ class IncidentLifecycleTests(unittest.IsolatedAsyncioTestCase):
                         await session.commit()
 
     async def asyncTearDown(self):
+        self.url_validator_patch.stop()
         await engine.dispose()
 
 

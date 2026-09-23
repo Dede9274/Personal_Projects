@@ -3,13 +3,19 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.database.connection import async_session_factory
-from app.database.models import CheckResultDB, IncidentDB, MonitorDB
+from app.database.models import (
+    CheckResultDB,
+    IncidentDB,
+    MonitorDB,
+    NotificationSettingsDB,
+)
 from app.models.incident import (
     ACTIVE_INCIDENT_STATUSES,
     IncidentStatus,
     IncidentTransitionError,
 )
 from app.models.monitor import CheckResult, Monitor
+from app.models.notification import NotificationPreferences
 
 
 def _monitor_to_domain(monitor_db: MonitorDB) -> Monitor:
@@ -31,6 +37,22 @@ def _check_result_to_domain(result_db: CheckResultDB) -> CheckResult:
         success=result_db.success,
         error=result_db.error,
         checked_at=result_db.checked_at,
+        security_rejected=result_db.security_rejected,
+    )
+
+
+def _notification_preferences_to_domain(
+    settings: NotificationSettingsDB,
+) -> NotificationPreferences:
+    return NotificationPreferences(
+        email_enabled=settings.email_enabled,
+        email_recipients=tuple(settings.email_recipients),
+        email_timeout_seconds=settings.email_timeout_seconds,
+        webhook_enabled=settings.webhook_enabled,
+        webhook_url=settings.webhook_url,
+        webhook_timeout_seconds=settings.webhook_timeout_seconds,
+        notify_incident_opened=settings.notify_incident_opened,
+        updated_at=settings.updated_at,
     )
 
 
@@ -109,6 +131,7 @@ async def save_check_result(
         latency_ms=check_result.latency_ms,
         success=check_result.success,
         error=check_result.error,
+        security_rejected=check_result.security_rejected,
     )
 
     async with async_session_factory() as session:
@@ -501,3 +524,58 @@ async def get_monitor_by_id(monitor_id: int) -> Monitor | None:
         return None
 
     return _monitor_to_domain(monitor_db)
+
+
+async def get_notification_preferences() -> NotificationPreferences:
+    """Return the singleton notification settings row."""
+    async with async_session_factory() as session:
+        settings = await session.get(NotificationSettingsDB, 1)
+
+        if settings is None:
+            settings = NotificationSettingsDB(id=1)
+            session.add(settings)
+            try:
+                await session.commit()
+                await session.refresh(settings)
+            except Exception:
+                await session.rollback()
+                raise
+
+    return _notification_preferences_to_domain(settings)
+
+
+async def update_notification_preferences(
+    preferences: NotificationPreferences,
+) -> NotificationPreferences:
+    """Replace the dashboard-controlled notification preferences."""
+    async with async_session_factory() as session:
+        settings = await session.get(
+            NotificationSettingsDB,
+            1,
+            with_for_update=True,
+        )
+
+        if settings is None:
+            settings = NotificationSettingsDB(id=1)
+            session.add(settings)
+
+        settings.email_enabled = preferences.email_enabled
+        settings.email_recipients = list(preferences.email_recipients)
+        settings.email_timeout_seconds = preferences.email_timeout_seconds
+        settings.webhook_enabled = preferences.webhook_enabled
+        settings.webhook_url = preferences.webhook_url
+        settings.webhook_timeout_seconds = (
+            preferences.webhook_timeout_seconds
+        )
+        settings.notify_incident_opened = (
+            preferences.notify_incident_opened
+        )
+
+        try:
+            await session.commit()
+            await session.refresh(settings)
+        except Exception:
+            await session.rollback()
+            raise
+
+    return _notification_preferences_to_domain(settings)

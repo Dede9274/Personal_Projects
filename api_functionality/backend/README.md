@@ -2,6 +2,8 @@
 
 The backend provides the FastAPI application, PostgreSQL persistence,
 scheduled monitor checks, incident detection, and email or webhook delivery.
+Monitor targets are restricted to public HTTP(S) destinations, and every
+redirect is resolved and revalidated before the worker follows it.
 
 ## Redis workers
 

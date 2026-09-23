@@ -23,6 +23,7 @@ from app.schemas.check_result import (
     CheckResultResponse,
 )
 from app.schemas.monitor import MonitorCreate, MonitorRead, MonitorUpdate
+from app.security.url_validator import MonitorUrlRejectedError
 from app.services import monitor_service
 
 
@@ -54,7 +55,13 @@ async def create_monitor(
     data: MonitorCreate,
     session: SessionDependency,
 ) -> MonitorDB:
-    return await monitor_service.create_monitor(session, data)
+    try:
+        return await monitor_service.create_monitor(session, data)
+    except MonitorUrlRejectedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
 
 
 @router.get(
@@ -180,11 +187,17 @@ async def update_monitor(
     data: MonitorUpdate,
     session: SessionDependency,
 ) -> MonitorDB:
-    monitor = await monitor_service.update_monitor(
-        session,
-        monitor_id,
-        data,
-    )
+    try:
+        monitor = await monitor_service.update_monitor(
+            session,
+            monitor_id,
+            data,
+        )
+    except MonitorUrlRejectedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
 
     if monitor is None:
         raise HTTPException(

@@ -7,7 +7,12 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from app.database.connection import async_session_factory, engine
-from app.database.models import CheckResultDB, IncidentDB, MonitorDB
+from app.database.models import (
+    CheckResultDB,
+    IncidentDB,
+    MonitorDB,
+    NotificationSettingsDB,
+)
 from app.database.repository import create_incident, increment_incident
 from app.services.monitor_service import list_monitor_checks
 
@@ -54,6 +59,25 @@ class DatabaseIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(stored_result)
             self.assertEqual(stored_result.monitor_id, monitor.id)
             self.assertEqual(stored_result.status_code, 200)
+            self.assertFalse(stored_result.security_rejected)
+
+            await session.rollback()
+
+    async def test_notification_settings_singleton_is_persisted(self):
+        async with async_session_factory() as session:
+            settings = await session.get(NotificationSettingsDB, 1)
+
+            self.assertIsNotNone(settings)
+            settings.email_recipients = ["ci-alerts@example.test"]
+            settings.email_enabled = True
+            await session.flush()
+
+            stored_settings = await session.get(NotificationSettingsDB, 1)
+            self.assertTrue(stored_settings.email_enabled)
+            self.assertEqual(
+                stored_settings.email_recipients,
+                ["ci-alerts@example.test"],
+            )
 
             await session.rollback()
 

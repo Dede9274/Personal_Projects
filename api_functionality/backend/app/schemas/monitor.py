@@ -10,8 +10,11 @@ from pydantic import (
     Field,
     HttpUrl,
     StringConstraints,
+    field_validator,
     model_validator,
 )
+
+from app.security.url_validator import validate_monitor_url_syntax
 
 
 MonitorName = Annotated[
@@ -50,6 +53,12 @@ class MonitorCreate(BaseModel):
     expected_status_code: HttpStatusCode = 200
     is_active: bool = True
 
+    @field_validator("url")
+    @classmethod
+    def reject_unsafe_url_syntax(cls, value: HttpUrl) -> HttpUrl:
+        validate_monitor_url_syntax(str(value))
+        return value
+
 
 class MonitorUpdate(BaseModel):
     """Fields that can be changed with a PATCH request."""
@@ -63,6 +72,16 @@ class MonitorUpdate(BaseModel):
     timeout_seconds: PositiveTimeout | None = None
     expected_status_code: HttpStatusCode | None = None
     is_active: bool | None = None
+
+    @field_validator("url")
+    @classmethod
+    def reject_unsafe_url_syntax(
+        cls,
+        value: HttpUrl | None,
+    ) -> HttpUrl | None:
+        if value is not None:
+            validate_monitor_url_syntax(str(value))
+        return value
 
     @model_validator(mode="before")
     @classmethod

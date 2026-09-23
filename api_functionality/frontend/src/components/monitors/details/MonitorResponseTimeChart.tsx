@@ -26,6 +26,7 @@ export default function MonitorResponseTimeChart({
   const chartData = useMemo(
     () =>
       [...checks]
+        .filter((check) => !check.security_rejected)
         .sort(
           (left, right) =>
             Date.parse(left.checked_at) - Date.parse(right.checked_at) ||

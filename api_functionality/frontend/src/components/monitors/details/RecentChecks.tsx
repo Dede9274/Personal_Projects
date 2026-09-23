@@ -101,16 +101,26 @@ export default function RecentChecks({ checks }: RecentChecksProps) {
                   <td className="min-w-0 px-2 py-2.5 align-top sm:px-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold sm:px-3 ${
-                        check.success
+                        check.security_rejected
+                          ? "bg-violet-100 text-violet-700"
+                          : check.success
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {check.success ? "Up" : "Down"}
+                      {check.security_rejected
+                        ? "Blocked"
+                        : check.success
+                          ? "Up"
+                          : "Down"}
                     </span>
                     {!check.success && check.error && (
                       <p
-                        className="mt-1 block w-full truncate text-[11px] text-red-600"
+                        className={`mt-1 block w-full truncate text-[11px] ${
+                          check.security_rejected
+                            ? "text-violet-700"
+                            : "text-red-600"
+                        }`}
                         title={check.error}
                       >
                         {check.error}
@@ -118,7 +128,9 @@ export default function RecentChecks({ checks }: RecentChecksProps) {
                     )}
                   </td>
                   <td className="break-words px-2 py-2.5 align-top leading-snug sm:px-3">
-                    {formatLatency(check.latency_ms)}
+                    {check.security_rejected
+                      ? "—"
+                      : formatLatency(check.latency_ms)}
                   </td>
                   <td className="break-words px-2 py-2.5 align-top sm:px-3">
                     {check.status_code ?? "—"}

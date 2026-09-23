@@ -18,3 +18,4 @@ class CheckResult:
     success: bool
     error: str | None
     checked_at: datetime
+    security_rejected: bool = False

@@ -6,12 +6,13 @@ import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts
 import type { CheckResult } from "@/lib/api/types";
 import { formatBerlinChartTime } from "@/lib/dateTime";
 
-type TimelineStatus = "up" | "down";
+type TimelineStatus = "up" | "down" | "blocked";
 
 const MAX_CHART_POINTS = 120;
 const statusColors: Record<TimelineStatus, string> = {
   up: "#22c55e",
   down: "#ef4444",
+  blocked: "#7c3aed",
 };
 
 type MonitorUptimeTimelineProps = {
@@ -34,7 +35,13 @@ export default function MonitorUptimeTimeline({
           id: check.id,
           time: formatBerlinChartTime(Date.parse(check.checked_at)),
           availability: 100,
-          status: (check.success ? "up" : "down") as TimelineStatus,
+          status: (
+            check.security_rejected
+              ? "blocked"
+              : check.success
+                ? "up"
+                : "down"
+          ) as TimelineStatus,
         })),
     [checks],
   );

@@ -81,6 +81,58 @@ class MonitorWorkerTests(unittest.IsolatedAsyncioTestCase):
 
         check_mock.assert_not_awaited()
 
+    async def test_security_rejection_is_saved_without_opening_incident(self):
+        monitor = Monitor(
+            id=7,
+            name="Blocked target",
+            url="http://127.0.0.1",
+            interval_seconds=30,
+            timeout_seconds=5,
+        )
+        check_result = CheckResult(
+            status_code=None,
+            latency_ms=1,
+            success=False,
+            error="Monitor URL rejected: The target is not public.",
+            checked_at=datetime.now(timezone.utc),
+            security_rejected=True,
+        )
+
+        with (
+            patch(
+                "app.workers.monitor_worker.get_active_monitor",
+                AsyncMock(return_value=monitor),
+            ),
+            patch(
+                "app.workers.monitor_worker.check_monitor",
+                AsyncMock(return_value=check_result),
+            ),
+            patch(
+                "app.workers.monitor_worker.save_check_result",
+                AsyncMock(),
+            ) as save_mock,
+            patch(
+                "app.workers.monitor_worker.process_check_result",
+                AsyncMock(return_value=None),
+            ) as incident_mock,
+            patch(
+                "app.workers.monitor_worker."
+                "enqueue_incident_opened_notifications",
+                AsyncMock(),
+            ) as notification_mock,
+        ):
+            await execute_monitor_job(7)
+
+        save_mock.assert_awaited_once_with(
+            monitor_id=7,
+            check_result=check_result,
+        )
+        incident_mock.assert_awaited_once_with(
+            monitor_id=7,
+            check_result=check_result,
+        )
+        notification_mock.assert_not_awaited()
+
     async def test_open_incident_enqueues_notifications(self):
         monitor = Monitor(
             id=7,

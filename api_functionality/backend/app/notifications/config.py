@@ -1,4 +1,4 @@
-"""Load notification settings from the backend .env file."""
+"""Load private notification transport settings from the environment."""
 
 import os
 from dataclasses import dataclass, field
@@ -6,13 +6,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from app.models.notification import NotificationChannel
-
-
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(ENV_FILE)
 
-TRUE_VALUES = {"1", "true", "yes", "on"}
 SMTP_SECURITY_VALUES = {"starttls", "ssl", "none"}
 
 
@@ -36,45 +32,34 @@ class WebhookSettings:
     timeout_seconds: float
 
 
-def _enabled(name: str) -> bool:
-    return os.getenv(name, "false").strip().lower() in TRUE_VALUES
+@dataclass(frozen=True)
+class SmtpConfigurationStatus:
+    configured: bool
+    host: str | None
+    port: int | None
+    security: str | None
+    from_email: str | None
+    error: str | None
 
 
-def get_enabled_notification_channels() -> list[NotificationChannel]:
-    """Return the channels explicitly enabled in environment settings."""
-    channels: list[NotificationChannel] = []
-
-    if _enabled("EMAIL_NOTIFICATIONS_ENABLED"):
-        channels.append(NotificationChannel.EMAIL)
-
-    if _enabled("WEBHOOK_NOTIFICATIONS_ENABLED"):
-        channels.append(NotificationChannel.WEBHOOK)
-
-    return channels
-
-
-def get_email_settings() -> EmailSettings:
+def _smtp_transport_values() -> tuple[
+    str,
+    int,
+    str | None,
+    str | None,
+    str,
+    str,
+]:
     host = os.getenv("SMTP_HOST", "").strip()
     from_email = os.getenv("SMTP_FROM_EMAIL", "").strip()
-    recipients = tuple(
-        address.strip()
-        for address in os.getenv("ALERT_EMAIL_TO", "").split(",")
-        if address.strip()
-    )
     username = os.getenv("SMTP_USERNAME") or None
     password = os.getenv("SMTP_PASSWORD") or None
     security = os.getenv("SMTP_SECURITY", "starttls").strip().lower()
 
-    if not host:
-        raise RuntimeError("SMTP_HOST is required for email notifications")
-    if not from_email:
-        raise RuntimeError(
-            "SMTP_FROM_EMAIL is required for email notifications"
-        )
-    if not recipients:
-        raise RuntimeError(
-            "ALERT_EMAIL_TO is required for email notifications"
-        )
+    if not host or host == "smtp.example.com":
+        raise RuntimeError("Set SMTP_HOST to a real mail server")
+    if not from_email or from_email == "uptime@example.com":
+        raise RuntimeError("Set SMTP_FROM_EMAIL to a real sender address")
     if (username is None) != (password is None):
         raise RuntimeError(
             "SMTP_USERNAME and SMTP_PASSWORD must be set together"
@@ -86,16 +71,76 @@ def get_email_settings() -> EmailSettings:
 
     try:
         port = int(os.getenv("SMTP_PORT", "587"))
-        timeout_seconds = float(os.getenv("SMTP_TIMEOUT_SECONDS", "10"))
     except ValueError as error:
-        raise RuntimeError(
-            "SMTP_PORT and SMTP_TIMEOUT_SECONDS must be numbers"
-        ) from error
+        raise RuntimeError("SMTP_PORT must be a number") from error
 
-    if port <= 0 or timeout_seconds <= 0:
-        raise RuntimeError(
-            "SMTP_PORT and SMTP_TIMEOUT_SECONDS must be positive"
+    if port <= 0:
+        raise RuntimeError("SMTP_PORT must be positive")
+
+    return host, port, username, password, from_email, security
+
+
+def get_smtp_configuration_status() -> SmtpConfigurationStatus:
+    """Return a browser-safe summary without exposing SMTP credentials."""
+    try:
+        host, port, _, _, from_email, security = _smtp_transport_values()
+    except RuntimeError as error:
+        return SmtpConfigurationStatus(
+            configured=False,
+            host=os.getenv("SMTP_HOST") or None,
+            port=None,
+            security=os.getenv("SMTP_SECURITY") or None,
+            from_email=os.getenv("SMTP_FROM_EMAIL") or None,
+            error=str(error),
         )
+
+    return SmtpConfigurationStatus(
+        configured=True,
+        host=host,
+        port=port,
+        security=security,
+        from_email=from_email,
+        error=None,
+    )
+
+
+def get_email_settings(
+    *,
+    recipients: tuple[str, ...] | None = None,
+    timeout_seconds: float | None = None,
+) -> EmailSettings:
+    (
+        host,
+        port,
+        username,
+        password,
+        from_email,
+        security,
+    ) = _smtp_transport_values()
+
+    if recipients is None:
+        recipients = tuple(
+            address.strip()
+            for address in os.getenv("ALERT_EMAIL_TO", "").split(",")
+            if address.strip()
+        )
+    if not recipients:
+        raise RuntimeError(
+            "ALERT_EMAIL_TO is required for email notifications"
+        )
+
+    if timeout_seconds is None:
+        try:
+            timeout_seconds = float(
+                os.getenv("SMTP_TIMEOUT_SECONDS", "10")
+            )
+        except ValueError as error:
+            raise RuntimeError(
+                "SMTP_TIMEOUT_SECONDS must be a number"
+            ) from error
+
+    if timeout_seconds <= 0:
+        raise RuntimeError("SMTP_TIMEOUT_SECONDS must be positive")
 
     return EmailSettings(
         host=host,
@@ -109,22 +154,27 @@ def get_email_settings() -> EmailSettings:
     )
 
 
-def get_webhook_settings() -> WebhookSettings:
-    url = os.getenv("ALERT_WEBHOOK_URL", "").strip()
+def get_webhook_settings(
+    *,
+    url: str | None = None,
+    timeout_seconds: float | None = None,
+) -> WebhookSettings:
+    url = url or os.getenv("ALERT_WEBHOOK_URL", "").strip()
 
     if not url:
         raise RuntimeError(
             "ALERT_WEBHOOK_URL is required for webhook notifications"
         )
 
-    try:
-        timeout_seconds = float(
-            os.getenv("WEBHOOK_TIMEOUT_SECONDS", "10")
-        )
-    except ValueError as error:
-        raise RuntimeError(
-            "WEBHOOK_TIMEOUT_SECONDS must be a number"
-        ) from error
+    if timeout_seconds is None:
+        try:
+            timeout_seconds = float(
+                os.getenv("WEBHOOK_TIMEOUT_SECONDS", "10")
+            )
+        except ValueError as error:
+            raise RuntimeError(
+                "WEBHOOK_TIMEOUT_SECONDS must be a number"
+            ) from error
 
     if timeout_seconds <= 0:
         raise RuntimeError(
