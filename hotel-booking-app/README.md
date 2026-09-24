@@ -1,120 +1,175 @@
-# Hotel Booking
+# Hotel Booking App
 
-A responsive React Native/Expo hotel discovery and booking-request application built with Expo SDK 57.
+A responsive React Native application for discovering hotels, comparing destinations, and submitting booking requests. It runs with Expo SDK 57 on Android and iOS and includes device-local authentication backed by SQLite.
+
+## Screenshots / GIF
+
+<table>
+  <tr>
+    <td align="center">
+      <strong>Welcome</strong><br />
+      <img src="./assets/Screenshots/IMG_3087.png" width="240" alt="Hotel Booking welcome screen" />
+    </td>
+    <td align="center">
+      <strong>Create account</strong><br />
+      <img src="./assets/Screenshots/IMG_3088.png" width="240" alt="Hotel Booking create account screen" />
+    </td>
+    <td align="center">
+      <strong>Hotel search</strong><br />
+      <img src="./assets/Screenshots/IMG_3086.png" width="240" alt="Hotel Booking search results screen" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>Hotel details</strong><br />
+      <img src="./assets/Screenshots/IMG_3085.png" width="240" alt="Hotel Booking hotel details screen" />
+    </td>
+    <td align="center">
+      <strong>Booking confirmation</strong><br />
+      <img src="./assets/Screenshots/IMG_3089.png" width="240" alt="Hotel Booking confirmation screen" />
+    </td>
+    <td></td>
+  </tr>
+</table>
 
 ## Features
 
 - Create an account and log in with validated credentials.
-- Persist users in an on-device SQLite database.
-- Restore the authenticated session after restarting the app.
-- Log out from the Home screen.
-- Search hotels by name or location.
-- Sort by recommended order, price, or guest rating.
-- Display filtered hotels on an interactive map.
-- Send a validated booking request for a selected hotel.
-- Review the complete request on a confirmation screen.
+- Store accounts in a persistent on-device SQLite database.
+- Hash passwords with a random salt and PBKDF2 before storage.
+- Restore authenticated sessions securely after restarting the app.
+- Search hotels by name or location in real time.
+- Sort results by recommended order, price, or guest rating.
+- Display filtered hotels on an interactive native map.
+- View hotel descriptions, pricing, ratings, and amenities.
+- Select check-in and check-out dates and guest counts.
+- Validate, assemble, and confirm complete booking requests.
 - Adapt layouts for narrow phones, larger phones, tablets, and orientation changes.
 
-## Authentication and local database
+## Tech stack
 
-The demo uses SQLite because it runs directly in Expo Go and does not require a separately hosted API or PostgreSQL server.
+| Area | Technology |
+| --- | --- |
+| Application | React 19, React Native 0.86 |
+| Tooling | Expo SDK 57, Metro, Babel |
+| Navigation | React Navigation 7 with a stack navigator |
+| Local database | Expo SQLite |
+| Session storage | Expo SecureStore |
+| Password security | Expo Crypto and `@noble/hashes` PBKDF2-SHA256 |
+| Maps | React Native Maps |
+| UI | React Native Paper, Expo Vector Icons, Safe Area Context |
+| Dates | Moment and React Native Calendar Picker |
+| Animation and gestures | React Native Reanimated, Worklets, and Gesture Handler |
 
-The `users` table stores:
+## Architecture
 
-- First and last name
-- A case-insensitive unique email address
-- A random password salt
-- A PBKDF2-derived password hash
-- The account creation timestamp
+The app uses provider-based state management and separates screens, reusable UI, persistence, domain validation, and static data.
 
-Passwords are never stored as plain text. SQL values are passed as query parameters rather than interpolated into statements. The active user ID is persisted with Expo SecureStore on Android and iOS.
-
-This is device-local authentication intended for a portfolio demo. Accounts do not synchronize between devices. A production version should move user records and password verification to a server-side authentication API backed by PostgreSQL or a managed identity provider.
-
-## Test the authentication flow
-
-1. Launch the app and select **Create an account**.
-2. Enter a name, a valid email address, and a password containing at least eight characters, one letter, and one number.
-3. Submit the form. The app creates the SQLite record and opens the authenticated Home screen.
-4. Select **Log out** in the Home header.
-5. Log in again with the same email and password.
-6. Close and reopen the app to verify that the secure session is restored.
-
-## Launch with Expo Go
-
-### 1. Install Expo Go
-
-Install the current **Expo Go** app from Google Play on Android or the App Store on iPhone. This project uses Expo SDK 57.
-
-### 2. Open the project directory
-
-```bash
-cd /home/olti/Desktop/Projects/Personal_Projects/hotel-booking-app
+```text
+App.js
+└── SQLiteProvider
+    └── AuthProvider
+        └── BookingProvider
+            └── NavigationContainer
+                └── StackNavigator
+                    ├── Guest screens
+                    │   ├── Welcome
+                    │   ├── LogIn
+                    │   └── SignUp
+                    └── Authenticated screens
+                        ├── Home
+                        ├── Single
+                        ├── Booking
+                        └── BookingConfirmation
 ```
 
-The old `ReactNative_PR/reactnative_pr` path no longer exists. If the editor still shows tabs from that location, close them and open the `hotel-booking-app` directory instead.
+```text
+src/
+├── components/   Reusable form, hotel, calendar, and icon components
+├── context/      Authentication and booking state/actions
+├── data/         Static hotel catalogue and map coordinates
+├── database/     SQLite schema and migrations
+├── navigation/   Guest/authenticated navigation flow
+├── screens/      Application pages
+├── services/     Password hashing and session persistence
+└── utils/        Authentication, booking, filtering, and sorting rules
+```
 
-### 3. Install dependencies
+Authentication flows through `AuthContext`: form validation runs first, credentials are normalized and hashed, parameterized queries write to SQLite, and the active user ID is stored in SecureStore. Booking data flows from the selected hotel into the booking form, through validation, into `BookingContext`, and finally to the confirmation screen.
+
+## Installation
+
+### Prerequisites
+
+- Node.js 20.19 or newer
+- npm
+- The current Expo Go application on an Android or iOS device
+- A phone and development computer connected to the same network
+
+### Setup
 
 ```bash
+git clone git@github.com:Dede9274/Personal_Projects.git
+cd ./Personal_Projects/hotel-booking-app
 npm install
-```
-
-You normally need to do this only the first time or after `package.json` changes.
-
-### 4. Put both devices on the same network
-
-Connect the phone and computer to the same Wi-Fi network. Temporarily disable a VPN if it prevents the phone from reaching the computer.
-
-### 5. Start Expo
-
-```bash
 npm start
 ```
 
-Keep the terminal open. Wait until it says `Metro waiting on` and displays a QR code.
+When Metro displays its QR code:
 
-### 6. Open the app
+- On Android, open Expo Go and select **Scan QR Code**.
+- On iOS, scan the code with the Camera app and open the Expo Go notification.
+- Keep the Metro terminal open while using the app.
 
-- **Android:** Open Expo Go, choose **Scan QR Code**, and scan the terminal QR code.
-- **iPhone:** Scan the QR code with the Camera app, then tap the Expo Go notification.
-
-If Expo Go asks you to sign in, use the same Expo account in Expo Go and the terminal:
-
-```bash
-npx expo login
-```
-
-Press `r` in the Metro terminal to reload or `m` to open the developer menu.
-
-### 7. Stop Expo
-
-Press `Ctrl+C` in the Metro terminal.
-
-For later launches:
+Useful commands:
 
 ```bash
-cd /home/olti/Desktop/Projects/Personal_Projects/hotel-booking-app
-npm start
+npm start                 # Start Metro and display the Expo Go QR code
+npm run android           # Open on a connected Android target
+npm run ios               # Open on an iOS target; requires macOS for Simulator
+npx expo start --tunnel   # Use when the phone cannot reach the local network URL
+npx expo start --clear    # Clear Metro's cache
 ```
 
-### Troubleshooting
+Press `r` in the Metro terminal to reload and `Ctrl+C` to stop the server.
 
-If the phone cannot connect to Metro, use tunnel mode:
+## Environment configuration
 
-```bash
-npx expo start --tunnel
-```
+No `.env` file, API key, PostgreSQL server, or hosted backend is required for this version.
 
-If Metro has stale cached data:
+| Setting | Current value or location |
+| --- | --- |
+| Expo application configuration | `app.json` |
+| Local database name | `hotel-booking.db` in `App.js` |
+| Database schema version | SQLite `PRAGMA user_version = 1` |
+| Hotel catalogue | `src/data/data.json` |
+| Android/iOS session key | `hotel-booking.user-id` in SecureStore |
+| App orientation | Portrait |
+| Expo SDK | 57 |
 
-```bash
-npx expo start --clear
-```
+The `users` table contains the user's name, case-insensitive unique email, password hash, password salt, and account creation timestamp. Passwords are never stored as plain text. Clearing the application's device data removes local accounts and sessions.
 
-## Booking payload
+A production deployment should supply backend configuration through environment variables and keep secrets on the server rather than in the mobile bundle.
 
-A valid request is assembled in this form:
+## API documentation
+
+This portfolio version does not call a reservation or authentication HTTP API. Authentication is local, hotels come from the bundled JSON catalogue, and booking requests remain in memory for the current app session.
+
+### Authentication service
+
+Provided by `src/context/AuthContext.js`:
+
+| Method | Input | Result |
+| --- | --- | --- |
+| `signUp` | `{ firstName, lastName, email, password }` | Creates a SQLite user and starts a session |
+| `signIn` | `{ email, password }` | Verifies the PBKDF2 hash and starts a session |
+| `signOut` | None | Clears the stored session and returns to guest navigation |
+
+Sign-up passwords must contain at least eight characters, one letter, and one number. Email addresses are trimmed, converted to lowercase, and enforced as unique.
+
+### Booking request
+
+`createBookingRequest` in `src/utils/booking.js` produces:
 
 ```json
 {
@@ -126,4 +181,44 @@ A valid request is assembled in this form:
 }
 ```
 
-Booking requests are currently stored in memory for the app session. `submitBooking` in `src/context/BookingContext.js` is the integration point for a production reservation API.
+`submitBooking` adds a reference such as `HB-123456`, a `Pending` status, and an ISO request timestamp. The production integration point is `submitBooking` in `src/context/BookingContext.js`.
+
+Validation rules require a selected hotel, both dates, a check-out date after check-in, at least one adult, and a non-negative whole-number child count.
+
+## Testing
+
+The project currently uses build validation and a documented manual test flow; an automated test runner has not yet been added.
+
+### Validation commands
+
+```bash
+npx expo-doctor@latest
+npx expo export --platform android --output-dir /tmp/hotel-booking-export --clear
+git diff --check
+```
+
+### Manual test checklist
+
+1. Create an account using a valid name, email, and password.
+2. Confirm duplicate emails, invalid emails, weak passwords, and mismatched passwords show errors.
+3. Log out, log in again, close the app, and confirm the session is restored.
+4. Search for a hotel name or destination and confirm the list filters immediately.
+5. Test every sort order and switch between list and map views.
+6. Open a hotel and verify its price, description, rating, and amenities.
+7. Start a booking and verify the selected hotel appears on the form.
+8. Test missing dates, an invalid date range, and invalid guest counts.
+9. Submit a valid request and verify every value on the confirmation screen.
+10. Repeat the main flow on a narrow phone, larger phone, and tablet or rotated device.
+
+The current codebase passes all 21 Expo Doctor compatibility checks and produces a successful Android production bundle.
+
+## Future improvements
+
+- Replace device-local authentication with a server-side API and PostgreSQL or a managed identity provider.
+- Persist booking requests remotely and add booking history, modification, and cancellation.
+- Add live hotel availability, pricing, payments, and email confirmations.
+- Add Jest and React Native Testing Library unit/component tests plus end-to-end tests with Maestro or Detox.
+- Add CI checks for linting, tests, Expo Doctor, and production builds.
+- Cache hotel images and catalogue data for offline use.
+- Add favorites, filters, localization, accessibility audits, and dark mode.
+- Publish development and production builds through EAS Build.
