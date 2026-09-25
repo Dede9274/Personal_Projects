@@ -24,11 +24,27 @@ API Checker separates its REST API, scheduler, check execution, and notification
 
 ### Operations dashboard
 
-![API Checker dashboard with monitor and incident summaries](docs/screenshots/dashboard.png)
+![API Checker operations dashboard with monitor totals, response-time chart, status breakdown, and recent incidents](<docs/screenshots/Screenshot from 2026-09-25 16-07-38.png>)
+
+### Monitor management
+
+![API Checker monitor list with health summaries, search and status filters, response times, and recent uptime](<docs/screenshots/Screenshot from 2026-09-25 16-08-36.png>)
 
 ### Monitor detail and incident history
 
-![API Checker monitor detail with current status, checks, and incident history](docs/screenshots/monitor-details.png)
+![API Checker monitor detail with current health, response-time and uptime charts, recent checks, incident history, and configuration](<docs/screenshots/Screenshot from 2026-09-25 16-08-52.png>)
+
+### Incident management
+
+![API Checker incidents page with severity summaries, filters, incident status, and lifecycle actions](<docs/screenshots/Screenshot from 2026-09-25 16-09-12.png>)
+
+### Notification channels
+
+![API Checker notification preferences for email and webhook delivery, SMTP verification, and incident events](<docs/screenshots/Screenshot from 2026-09-25 16-09-47.png>)
+
+### Monitoring settings
+
+![API Checker settings for check intervals, request timeouts, expected status codes, redirects, refresh rate, and time format](<docs/screenshots/Screenshot from 2026-09-25 16-09-34.png>)
 
 The screenshots use representative local data; the interface itself is the application in this repository.
 
