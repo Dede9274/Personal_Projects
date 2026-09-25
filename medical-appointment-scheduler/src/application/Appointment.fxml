@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="720.0" prefWidth="1000.0" styleClass="app-root"
+            stylesheets="@application.css" xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.AppointmentController">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="topbar">
+            <Label styleClass="topbar-mark" text="+" />
+            <Label styleClass="topbar-brand" text="PhysioCare" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Label styleClass="topbar-context" text="Secure patient portal" />
+        </HBox>
+    </top>
+    <left>
+        <VBox prefWidth="220.0" spacing="8.0" styleClass="sidebar">
+            <Label styleClass="sidebar-caption" text="PATIENT PORTAL" />
+            <Button fx:id="dashboardButton" maxWidth="Infinity" onAction="#gotoMainPage"
+                    styleClass="nav-button" text="Dashboard" />
+            <Button disable="true" maxWidth="Infinity" styleClass="nav-button,active" text="Book appointment" />
+            <Button fx:id="appointmentsButton" maxWidth="Infinity" onAction="#gotoMyappointmentsC"
+                    styleClass="nav-button" text="My appointments" />
+            <Region VBox.vgrow="ALWAYS" />
+            <Button fx:id="logoutButton" maxWidth="Infinity" onAction="#gotoLogIn"
+                    styleClass="nav-button,logout-button" text="Sign out" />
+        </VBox>
+    </left>
+    <center>
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="content-scroll">
+            <content>
+                <VBox spacing="16.0" styleClass="content-area,booking-content">
+                    <Label styleClass="eyebrow" text="NEW REQUEST" />
+                    <Label styleClass="screen-title" text="Book an appointment" />
+                    <Label styleClass="screen-subtitle"
+                           text="Tell us who the visit is for and choose your preferred date and time." />
+
+                    <VBox spacing="12.0" styleClass="form-card,booking-form-card">
+                        <GridPane hgap="18.0" vgap="10.0">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                            </columnConstraints>
+
+                            <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label styleClass="field-label" text="First name" />
+                                <TextField fx:id="firstnameTextField" promptText="Patient's first name" />
+                            </VBox>
+                            <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label styleClass="field-label" text="Last name" />
+                                <TextField fx:id="lastnameTextField" promptText="Patient's last name" />
+                            </VBox>
+                            <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label styleClass="field-label" text="Phone number" />
+                                <TextField fx:id="phonenrTextField" promptText="e.g. +49 123 456789" />
+                            </VBox>
+                            <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label styleClass="field-label" text="Patient or insurance ID" />
+                                <TextField fx:id="idTextField" promptText="Enter the relevant ID" />
+                            </VBox>
+                            <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.columnSpan="2" GridPane.rowIndex="2">
+                                <Label styleClass="field-label" text="Reason for the visit" />
+                                <TextArea fx:id="descriptionTextArea" prefRowCount="3"
+                                          promptText="Briefly describe your symptoms or what you would like help with."
+                                          wrapText="true" />
+                            </VBox>
+                            <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="3">
+                                <Label styleClass="field-label" text="Preferred date" />
+                                <DatePicker fx:id="dateChooser" maxWidth="Infinity" />
+                            </VBox>
+                            <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
+                                <Label styleClass="field-label" text="Preferred time" />
+                                <ChoiceBox fx:id="timeChooser" maxWidth="Infinity" />
+                            </VBox>
+                        </GridPane>
+
+                        <Label styleClass="privacy-note"
+                               text="Your details are used only to manage this appointment request."
+                               wrapText="true" />
+                        <Label fx:id="appointmentMessageLabel" minHeight="22.0"
+                               styleClass="status-label" wrapText="true" />
+                        <HBox alignment="CENTER_RIGHT">
+                            <Button fx:id="placeAppointmentBtn" defaultButton="true"
+                                    onAction="#placeAppointmentC" styleClass="primary-button"
+                                    text="Request appointment" />
+                        </HBox>
+                    </VBox>
+                </VBox>
+            </content>
+        </ScrollPane>
+    </center>
+</BorderPane>

@@ -1,0 +1,386 @@
+.root {
+    -fx-font-family: "Segoe UI";
+    -fx-font-size: 14px;
+    -brand: #4f46e5;
+    -brand-dark: #3730a3;
+    -brand-soft: #eef2ff;
+    -ink: #172033;
+    -muted: #667085;
+    -line: #e6eaf0;
+    -surface: #ffffff;
+    -canvas: #f5f7fb;
+    -success: #137a4b;
+    -danger: #c4384f;
+}
+
+.app-root {
+    -fx-background-color: -canvas;
+}
+
+.auth-background {
+    -fx-background-color: linear-gradient(to bottom right, #eef2ff, #f8fafc 48%, #ecfdf5);
+}
+
+.auth-shell {
+    -fx-background-color: -surface;
+    -fx-background-radius: 24px;
+    -fx-effect: dropshadow(gaussian, rgba(34, 46, 80, 0.18), 32, 0.12, 0, 12);
+}
+
+.auth-brand-panel {
+    -fx-padding: 46px;
+    -fx-background-color: linear-gradient(to bottom right, #3730a3, #4f46e5);
+    -fx-background-radius: 24px 0 0 24px;
+}
+
+.auth-form-panel {
+    -fx-padding: 38px 46px;
+    -fx-background-color: -surface;
+    -fx-background-radius: 0 24px 24px 0;
+}
+
+.brand-symbol,
+.topbar-mark {
+    -fx-alignment: center;
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 12px;
+    -fx-text-fill: -brand;
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-min-width: 42px;
+    -fx-min-height: 42px;
+}
+
+.auth-brand-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+}
+
+.auth-brand-copy {
+    -fx-text-fill: rgba(255, 255, 255, 0.88);
+    -fx-font-size: 18px;
+    -fx-line-spacing: 4px;
+}
+
+.auth-feature {
+    -fx-text-fill: rgba(255, 255, 255, 0.86);
+    -fx-font-size: 13px;
+}
+
+.eyebrow,
+.sidebar-caption,
+.hero-kicker {
+    -fx-text-fill: -brand;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.page-title,
+.screen-title {
+    -fx-text-fill: -ink;
+    -fx-font-size: 29px;
+    -fx-font-weight: bold;
+}
+
+.body-copy,
+.screen-subtitle,
+.muted-copy,
+.card-copy,
+.empty-copy {
+    -fx-text-fill: -muted;
+}
+
+.field-label {
+    -fx-text-fill: #344054;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.text-field,
+.password-field,
+.text-area,
+.date-picker,
+.choice-box {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d8dee9;
+    -fx-border-radius: 9px;
+    -fx-background-radius: 9px;
+    -fx-min-height: 42px;
+    -fx-prompt-text-fill: #98a2b3;
+}
+
+.text-field,
+.password-field,
+.text-area {
+    -fx-padding: 9px 12px;
+}
+
+.text-area .content {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 9px;
+}
+
+.text-field:focused,
+.password-field:focused,
+.text-area:focused,
+.date-picker:focused,
+.choice-box:focused {
+    -fx-border-color: -brand;
+    -fx-effect: dropshadow(gaussian, rgba(79, 70, 229, 0.17), 8, 0.15, 0, 0);
+}
+
+.button,
+.hyperlink {
+    -fx-cursor: hand;
+}
+
+.primary-button {
+    -fx-background-color: -brand;
+    -fx-background-radius: 9px;
+    -fx-padding: 11px 20px;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: bold;
+    -fx-min-height: 42px;
+}
+
+.primary-button:hover {
+    -fx-background-color: -brand-dark;
+    -fx-effect: dropshadow(gaussian, rgba(55, 48, 163, 0.26), 12, 0.12, 0, 4);
+}
+
+.primary-button:pressed {
+    -fx-translate-y: 1px;
+}
+
+.secondary-button {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #cfd5e1;
+    -fx-border-radius: 9px;
+    -fx-background-radius: 9px;
+    -fx-padding: 10px 18px;
+    -fx-text-fill: #344054;
+    -fx-font-weight: bold;
+    -fx-min-height: 42px;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #aeb7c6;
+}
+
+.text-link {
+    -fx-padding: 2px 0;
+    -fx-text-fill: -brand;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent;
+}
+
+.text-link:hover {
+    -fx-text-fill: -brand-dark;
+    -fx-underline: true;
+}
+
+.status-label {
+    -fx-font-size: 12px;
+}
+
+.status-error {
+    -fx-text-fill: -danger;
+}
+
+.status-success {
+    -fx-text-fill: -success;
+}
+
+.topbar {
+    -fx-padding: 14px 24px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent -line transparent;
+}
+
+.topbar-mark {
+    -fx-background-color: -brand;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 20px;
+    -fx-min-width: 34px;
+    -fx-min-height: 34px;
+}
+
+.topbar-brand {
+    -fx-text-fill: -ink;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.topbar-context {
+    -fx-text-fill: -muted;
+}
+
+.user-chip {
+    -fx-padding: 8px 13px;
+    -fx-background-color: -brand-soft;
+    -fx-background-radius: 20px;
+    -fx-text-fill: -brand-dark;
+    -fx-font-weight: bold;
+}
+
+.sidebar {
+    -fx-padding: 28px 16px 20px 16px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent -line transparent transparent;
+}
+
+.sidebar-caption {
+    -fx-padding: 0 10px 12px 10px;
+    -fx-text-fill: #98a2b3;
+}
+
+.nav-button {
+    -fx-alignment: center-left;
+    -fx-background-color: transparent;
+    -fx-background-radius: 9px;
+    -fx-padding: 12px 14px;
+    -fx-text-fill: #475467;
+    -fx-font-weight: bold;
+}
+
+.nav-button:hover {
+    -fx-background-color: #f3f4f8;
+    -fx-text-fill: -ink;
+}
+
+.nav-button.active,
+.nav-button.active:disabled {
+    -fx-opacity: 1;
+
+    -fx-background-color: -brand-soft;
+    -fx-text-fill: -brand-dark;
+}
+
+.logout-button {
+    -fx-text-fill: -danger;
+}
+
+.logout-button:hover {
+    -fx-background-color: #fff1f3;
+    -fx-text-fill: #a9233a;
+}
+
+.content-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.content-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.content-area {
+    -fx-padding: 34px 38px 40px 38px;
+    -fx-background-color: -canvas;
+}
+
+.booking-content {
+    -fx-padding: 22px 38px 10px 38px;
+}
+
+.hero-card {
+    -fx-padding: 28px;
+    -fx-background-color: linear-gradient(to right, #eef2ff, #f5f3ff);
+    -fx-background-radius: 18px;
+    -fx-border-color: #dfe3ff;
+    -fx-border-radius: 18px;
+}
+
+.hero-title {
+    -fx-text-fill: -ink;
+    -fx-font-size: 23px;
+    -fx-font-weight: bold;
+}
+
+.hero-copy {
+    -fx-text-fill: #505b70;
+    -fx-line-spacing: 3px;
+}
+
+.info-card,
+.form-card {
+    -fx-padding: 24px;
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 16px;
+    -fx-border-color: -line;
+    -fx-border-radius: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(33, 43, 72, 0.08), 16, 0.08, 0, 5);
+}
+
+.booking-form-card {
+    -fx-padding: 20px 24px;
+}
+
+.card-icon {
+    -fx-alignment: center;
+    -fx-background-color: -brand-soft;
+    -fx-background-radius: 10px;
+    -fx-text-fill: -brand-dark;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+}
+
+.card-title,
+.empty-title {
+    -fx-text-fill: -ink;
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}
+
+.privacy-note {
+    -fx-padding: 12px 14px;
+    -fx-background-color: #f8fafc;
+    -fx-background-radius: 9px;
+    -fx-text-fill: -muted;
+    -fx-font-size: 12px;
+}
+
+.appointments-table {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 14px;
+    -fx-border-color: -line;
+    -fx-border-radius: 14px;
+    -fx-padding: 1px;
+}
+
+.appointments-table .column-header-background {
+    -fx-background-color: #f8fafc;
+    -fx-background-radius: 14px 14px 0 0;
+}
+
+.appointments-table .column-header,
+.appointments-table .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -line transparent;
+    -fx-size: 46px;
+}
+
+.appointments-table .column-header .label {
+    -fx-alignment: center-left;
+    -fx-text-fill: #475467;
+    -fx-font-weight: bold;
+}
+
+.appointments-table .table-row-cell {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent #f0f2f5 transparent;
+    -fx-cell-size: 48px;
+}
+
+.appointments-table .table-row-cell:hover {
+    -fx-background-color: #fafbff;
+}
+
+.appointments-table .table-row-cell:selected {
+    -fx-background-color: -brand-soft;
+    -fx-text-background-color: -ink;
+}

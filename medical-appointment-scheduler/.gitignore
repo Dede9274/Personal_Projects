@@ -1,0 +1,9 @@
+target/
+bin/
+.env
+.idea/
+*.iml
+*.db
+*.db-shm
+*.db-wal
+.tools/

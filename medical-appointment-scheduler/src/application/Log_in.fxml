@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="620.0" prefWidth="900.0" styleClass="app-root,auth-background"
+            stylesheets="@application.css" xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.Log_inController">
+    <center>
+        <StackPane>
+            <padding>
+                <Insets bottom="48.0" left="40.0" right="40.0" top="48.0" />
+            </padding>
+            <HBox maxHeight="500.0" maxWidth="820.0" styleClass="auth-shell">
+                <VBox alignment="CENTER_LEFT" prefWidth="350.0" spacing="18.0" styleClass="auth-brand-panel">
+                    <Label styleClass="brand-symbol" text="+" />
+                    <Label styleClass="auth-brand-title" text="PhysioCare" />
+                    <Label styleClass="auth-brand-copy" text="Your appointments, organised around your recovery." wrapText="true" />
+                    <Label styleClass="auth-feature" text="✓ Private account-based appointments" />
+                    <Label styleClass="auth-feature" text="✓ Simple booking in a few steps" />
+                    <Label styleClass="auth-feature" text="✓ Your schedule available at a glance" />
+                </VBox>
+                <VBox alignment="CENTER_LEFT" prefWidth="470.0" spacing="13.0" styleClass="auth-form-panel">
+                    <Label styleClass="eyebrow" text="PATIENT PORTAL" />
+                    <Label styleClass="page-title" text="Welcome back" />
+                    <Label styleClass="body-copy" text="Sign in to book a visit or review your upcoming appointments." wrapText="true" />
+
+                    <Label styleClass="field-label" text="Username" />
+                    <TextField fx:id="usernameinput" onAction="#SignIn" promptText="Enter your username" />
+
+                    <Label styleClass="field-label" text="Password" />
+                    <PasswordField fx:id="passwordinput" onAction="#SignIn" promptText="Enter your password" />
+
+                    <Label fx:id="loginMessageLabel" minHeight="22.0" styleClass="status-label" wrapText="true" />
+                    <Button fx:id="loginbutton" defaultButton="true" maxWidth="Infinity" onAction="#SignIn"
+                            styleClass="primary-button" text="Sign in" />
+
+                    <HBox alignment="CENTER" spacing="4.0">
+                        <Label styleClass="muted-copy" text="New to PhysioCare?" />
+                        <Hyperlink fx:id="gotoSignUp" onAction="#gotoSignUpC" styleClass="text-link"
+                                   text="Create an account" />
+                    </HBox>
+                </VBox>
+            </HBox>
+        </StackPane>
+    </center>
+</BorderPane>

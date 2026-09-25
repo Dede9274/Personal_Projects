@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="680.0" prefWidth="1000.0" styleClass="app-root"
+            stylesheets="@application.css" xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MyAppointmentsController">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="topbar">
+            <Label styleClass="topbar-mark" text="+" />
+            <Label styleClass="topbar-brand" text="PhysioCare" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Label styleClass="topbar-context" text="Secure patient portal" />
+        </HBox>
+    </top>
+    <left>
+        <VBox prefWidth="220.0" spacing="8.0" styleClass="sidebar">
+            <Label styleClass="sidebar-caption" text="PATIENT PORTAL" />
+            <Button fx:id="dashboardButton" maxWidth="Infinity" onAction="#gotoMainpage"
+                    styleClass="nav-button" text="Dashboard" />
+            <Button fx:id="newAppointmentButton" maxWidth="Infinity" onAction="#gotoNewAppointment"
+                    styleClass="nav-button" text="Book appointment" />
+            <Button disable="true" maxWidth="Infinity" styleClass="nav-button,active" text="My appointments" />
+            <Region VBox.vgrow="ALWAYS" />
+            <Button fx:id="logoutButton" maxWidth="Infinity" onAction="#gotoLogIn"
+                    styleClass="nav-button,logout-button" text="Sign out" />
+        </VBox>
+    </left>
+    <center>
+        <VBox spacing="18.0" styleClass="content-area">
+            <Label styleClass="eyebrow" text="YOUR SCHEDULE" />
+            <HBox alignment="CENTER_LEFT" spacing="12.0">
+                <VBox spacing="5.0" HBox.hgrow="ALWAYS">
+                    <Label styleClass="screen-title" text="My appointments" />
+                    <Label fx:id="appointmentCountLabel" styleClass="screen-subtitle" text="0 appointments" />
+                </VBox>
+                <Button onAction="#showAppointments" styleClass="secondary-button" text="Refresh" />
+                <Button onAction="#gotoNewAppointment" styleClass="primary-button" text="Book new" />
+            </HBox>
+
+            <Label fx:id="tableMessageLabel" minHeight="22.0" styleClass="status-label" wrapText="true" />
+            <TableView fx:id="AppointmentsTable" styleClass="appointments-table" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <VBox alignment="CENTER" spacing="8.0">
+                        <Label styleClass="empty-title" text="No appointments yet" />
+                        <Label styleClass="empty-copy"
+                               text="When you request an appointment, its details will appear here." />
+                    </VBox>
+                </placeholder>
+                <columns>
+                    <TableColumn fx:id="dateColumn" prefWidth="110.0" resizable="false" text="Date" />
+                    <TableColumn fx:id="timeColumn" prefWidth="80.0" resizable="false" text="Time" />
+                    <TableColumn fx:id="descriptionColumn" prefWidth="245.0" text="Reason for visit" />
+                    <TableColumn fx:id="phoneNrColumn" prefWidth="145.0" resizable="false" text="Phone number" />
+                    <TableColumn fx:id="IdnrColumn" prefWidth="120.0" resizable="false" text="Patient ID" />
+                </columns>
+            </TableView>
+        </VBox>
+    </center>
+</BorderPane>

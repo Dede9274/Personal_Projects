@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="680.0" prefWidth="900.0" styleClass="app-root,auth-background"
+            stylesheets="@application.css" xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.Sign_upController">
+    <center>
+        <StackPane>
+            <padding>
+                <Insets bottom="32.0" left="40.0" right="40.0" top="32.0" />
+            </padding>
+            <HBox maxHeight="616.0" maxWidth="840.0" styleClass="auth-shell">
+                <VBox alignment="CENTER_LEFT" prefWidth="330.0" spacing="18.0" styleClass="auth-brand-panel">
+                    <Label styleClass="brand-symbol" text="+" />
+                    <Label styleClass="auth-brand-title" text="PhysioCare" />
+                    <Label styleClass="auth-brand-copy"
+                           text="Create your private patient account and request appointments with confidence."
+                           wrapText="true" />
+                    <Label styleClass="auth-feature" text="✓ Visits stay linked to your account" />
+                    <Label styleClass="auth-feature" text="✓ Secure password protection" />
+                    <Label styleClass="auth-feature" text="✓ Local, straightforward scheduling" />
+                </VBox>
+                <VBox alignment="CENTER_LEFT" prefWidth="510.0" spacing="9.0" styleClass="auth-form-panel">
+                    <Label styleClass="eyebrow" text="GET STARTED" />
+                    <Label styleClass="page-title" text="Create your account" />
+                    <Label styleClass="body-copy" text="Enter your details below. All fields are required." />
+
+                    <HBox spacing="12.0">
+                        <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="First name" />
+                            <TextField fx:id="firstnameinput" maxWidth="Infinity" promptText="First name" />
+                        </VBox>
+                        <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Last name" />
+                            <TextField fx:id="lastnameinput" maxWidth="Infinity" promptText="Last name" />
+                        </VBox>
+                    </HBox>
+
+                    <Label styleClass="field-label" text="Username" />
+                    <TextField fx:id="usernameinput" promptText="Choose a username" />
+
+                    <Label styleClass="field-label" text="Password" />
+                    <PasswordField fx:id="passwordinput" promptText="At least 15 characters" />
+
+                    <Label styleClass="field-label" text="Confirm password" />
+                    <PasswordField fx:id="confirmpasswordinput" onAction="#SignUp" promptText="Repeat your password" />
+
+                    <Label fx:id="signupMessageLabel" minHeight="22.0" styleClass="status-label" wrapText="true" />
+                    <Button fx:id="signupbutton" defaultButton="true" maxWidth="Infinity" onAction="#SignUp"
+                            styleClass="primary-button" text="Create account" />
+
+                    <HBox alignment="CENTER" spacing="4.0">
+                        <Label styleClass="muted-copy" text="Already have an account?" />
+                        <Hyperlink fx:id="gotoLogin" onAction="#gotoLoginC" styleClass="text-link"
+                                   text="Return to sign in" />
+                    </HBox>
+                </VBox>
+            </HBox>
+        </StackPane>
+    </center>
+</BorderPane>

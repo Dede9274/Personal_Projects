@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="680.0" prefWidth="1000.0" styleClass="app-root"
+            stylesheets="@application.css" xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainpageController">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="topbar">
+            <Label styleClass="topbar-mark" text="+" />
+            <Label styleClass="topbar-brand" text="PhysioCare" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="welcomeLabel" styleClass="user-chip" text="Signed in" />
+        </HBox>
+    </top>
+    <left>
+        <VBox prefWidth="220.0" spacing="8.0" styleClass="sidebar">
+            <Label styleClass="sidebar-caption" text="PATIENT PORTAL" />
+            <Button disable="true" maxWidth="Infinity" styleClass="nav-button,active" text="Dashboard" />
+            <Button fx:id="bookAppointmentButton" maxWidth="Infinity" onAction="#gotoAppointmentsC"
+                    styleClass="nav-button" text="Book appointment" />
+            <Button fx:id="myAppointmentsButton" maxWidth="Infinity" onAction="#gotoMyappointments"
+                    styleClass="nav-button" text="My appointments" />
+            <Region VBox.vgrow="ALWAYS" />
+            <Button fx:id="logoutButton" maxWidth="Infinity" onAction="#gotoLogIn"
+                    styleClass="nav-button,logout-button" text="Sign out" />
+        </VBox>
+    </left>
+    <center>
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="content-scroll">
+            <content>
+                <VBox spacing="24.0" styleClass="content-area">
+                    <Label styleClass="eyebrow" text="OVERVIEW" />
+                    <Label styleClass="screen-title" text="Good care starts with a clear plan." />
+                    <Label maxWidth="650.0" styleClass="screen-subtitle"
+                           text="Request your next physiotherapy visit and keep every appointment organised in one private place."
+                           wrapText="true" />
+
+                    <VBox spacing="16.0" styleClass="hero-card">
+                        <Label styleClass="hero-kicker" text="READY WHEN YOU ARE" />
+                        <Label styleClass="hero-title" text="Book your next appointment" />
+                        <Label maxWidth="560.0" styleClass="hero-copy"
+                               text="Choose a date and time that works for you, add the reason for your visit, and submit your request in a few steps."
+                               wrapText="true" />
+                        <HBox spacing="12.0">
+                            <Button onAction="#gotoAppointmentsC" styleClass="primary-button"
+                                    text="Book an appointment" />
+                            <Button onAction="#gotoMyappointments" styleClass="secondary-button"
+                                    text="View my appointments" />
+                        </HBox>
+                    </VBox>
+
+                    <HBox spacing="18.0">
+                        <VBox spacing="10.0" styleClass="info-card" HBox.hgrow="ALWAYS">
+                            <Label styleClass="card-icon" text="01" />
+                            <Label styleClass="card-title" text="Private by design" />
+                            <Label styleClass="card-copy"
+                                   text="Only appointments linked to your signed-in account appear in your history."
+                                   wrapText="true" />
+                            <Hyperlink onAction="#showPrivacy" styleClass="text-link" text="How your data is handled" />
+                        </VBox>
+                        <VBox spacing="10.0" styleClass="info-card" HBox.hgrow="ALWAYS">
+                            <Label styleClass="card-icon" text="02" />
+                            <Label styleClass="card-title" text="Need assistance?" />
+                            <Label styleClass="card-copy"
+                                   text="Reception can help with scheduling questions or changes to an existing request."
+                                   wrapText="true" />
+                            <Hyperlink onAction="#showContact" styleClass="text-link" text="Contact reception" />
+                        </VBox>
+                    </HBox>
+                </VBox>
+            </content>
+        </ScrollPane>
+    </center>
+</BorderPane>
