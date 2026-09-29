@@ -49,18 +49,50 @@ enriched articles to the dashboard.
 
 ## Run locally
 
+1. Create accounts and generate your own API keys:
+
+   - [Finnhub API key](https://finnhub.io/dashboard)
+   - [Groq API key](https://console.groq.com/keys)
+
+2. Create and activate a virtual environment, then install the dependencies:
+
 ```bash
+cd stock_market_fetcher
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-export FINNHUB_API_KEY="your-finnhub-key"
-export GROQ_API_KEY="your-groq-key"
+python -m pip install -r requirements.txt
+```
+
+3. Create your local environment file from the provided template:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and replace the placeholders with your own keys:
+
+```dotenv
+FINNHUB_API_KEY=your-finnhub-key
+GROQ_API_KEY=your-groq-key
+GROQ_MODEL=openai/gpt-oss-20b
+```
+
+The `.env` file is ignored by Git and must never be committed. The application
+loads it automatically at startup, so the keys remain available after closing
+the proxy or terminal. On Linux and macOS, you can restrict access to the file
+with `chmod 600 .env`.
+
+4. Start the server:
+
+```bash
 python3 finnhub_proxy.py
 ```
 
 Open <http://localhost:5050>.
 
-`GROQ_MODEL` can optionally override the default `openai/gpt-oss-20b` model.
+When opening a new terminal, activate the existing environment again with
+`source .venv/bin/activate` before starting the server. `GROQ_MODEL` is optional
+and defaults to `openai/gpt-oss-20b` if omitted.
 
 ## Screenshots
 
@@ -77,8 +109,8 @@ Open <http://localhost:5050>.
 Install the Python development dependency and run both suites:
 
 ```bash
-pip install -r requirements-dev.txt
-python3 -m pytest tests
+python -m pip install -r requirements-dev.txt
+PYTHONPATH=.. python -m pytest tests
 npm test
 ```
 

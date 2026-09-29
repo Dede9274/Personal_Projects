@@ -5,11 +5,13 @@ import json
 import os
 import re
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 import requests
 
 app = Flask(__name__, static_folder="frontend", static_url_path="")
 
+load_dotenv()
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b").strip()
