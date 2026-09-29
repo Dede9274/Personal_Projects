@@ -30,12 +30,12 @@ def get_news(ticker):
     if not FINNHUB_API_KEY:
         return jsonify({"error": "Finnhub is not configured on the server"}), 503
 
-    ticker = ticker.upper()
+    ticker = ticker.upper() #Turn ticker to uppercase
     if not TICKER_PATTERN.fullmatch(ticker):
         return jsonify({"error": "Invalid ticker symbol"}), 400
 
     to_date = datetime.today().strftime("%Y-%m-%d")
-    from_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
+    from_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d") #Find articles from a week ago
     params = {
         "symbol": ticker,
         "from": from_date,
@@ -45,7 +45,7 @@ def get_news(ticker):
 
     try:
         response = requests.get(
-            f"{FINNHUB_BASE}/company-news", params=params, timeout=10
+            f"{FINNHUB_BASE}/company-news", params=params, timeout=10 #GET Request to the Finnhub API
         )
     except requests.exceptions.Timeout as exc:
         _log_upstream_failure("Finnhub", exc, ticker)
@@ -96,6 +96,7 @@ def get_news(ticker):
         return jsonify({"error": "Finnhub returned an invalid response."}), 502
 
 
+#Use Groq to classify and analyse article
 @app.post("/api/analyse-news")
 def analyse_news():
     if not GROQ_API_KEY:
